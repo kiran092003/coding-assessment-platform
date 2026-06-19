@@ -1,0 +1,79 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "API Gateway",
+      "program": "${workspaceFolder}/server/api-gateway/index.js",
+      "cwd": "${workspaceFolder}/server/api-gateway",
+      "envFile": "${workspaceFolder}/server/api-gateway/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Auth Service",
+      "program": "${workspaceFolder}/server/auth-service/index.js",
+      "cwd": "${workspaceFolder}/server/auth-service",
+      "envFile": "${workspaceFolder}/server/auth-service/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Question Service",
+      "program": "${workspaceFolder}/server/question-service/index.js",
+      "cwd": "${workspaceFolder}/server/question-service",
+      "envFile": "${workspaceFolder}/server/question-service/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Submission Service",
+      "program": "${workspaceFolder}/server/submission-service/index.js",
+      "cwd": "${workspaceFolder}/server/submission-service",
+      "envFile": "${workspaceFolder}/server/submission-service/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Judge Service",
+      "program": "${workspaceFolder}/server/judge-service/index.js",
+      "cwd": "${workspaceFolder}/server/judge-service",
+      "envFile": "${workspaceFolder}/server/judge-service/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Contest Service",
+      "program": "${workspaceFolder}/server/contest-service/index.js",
+      "cwd": "${workspaceFolder}/server/contest-service",
+      "envFile": "${workspaceFolder}/server/contest-service/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "All Services",
+      "configurations": [
+        "API Gateway",
+        "Auth Service",
+        "Question Service",
+        "Submission Service",
+        "Judge Service",
+        "Contest Service"
+      ],
+      "stopAll": true
+    }
+  ]
+}

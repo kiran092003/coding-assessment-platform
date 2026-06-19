@@ -1,0 +1,238 @@
+services:
+
+  # ─── Infrastructure ──────────────────────────────────────────────────────────
+
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: Shamlatha@123
+      MYSQL_DATABASE: coding_assessment_platform
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pShamlatha@123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─── Services ────────────────────────────────────────────────────────────────
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      AUTH_SERVICE_URL: http://auth-service:4001
+      QUESTION_SERVICE_URL: http://question-service:4002
+      CONTEST_SERVICE_URL: http://contest-service:4003
+      SUBMISSION_SERVICE_URL: http://submission-service:4004
+      JUDGE_SERVICE_URL: http://judge-service:4005
+      LEADERBOARD_SERVICE_URL: http://leaderboard-service:4006
+    depends_on:
+      auth-service:
+        condition: service_started
+      question-service:
+        condition: service_started
+      contest-service:
+        condition: service_started
+      submission-service:
+        condition: service_started
+      judge-service:
+        condition: service_started
+      leaderboard-service:
+        condition: service_started
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    ports:
+      - "4001:4001"
+    environment:
+      PORT: 4001
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: Shamlatha@123
+      DB_NAME: coding_assessment_platform
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: access_secret_key
+      JWT_REFRESH_SECRET: refresh_secret_key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  question-service:
+    build:
+      context: .
+      dockerfile: question-service/Dockerfile
+    container_name: question-service
+    ports:
+      - "4002:4002"
+    environment:
+      PORT: 4002
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: Shamlatha@123
+      DB_NAME: coding_assessment_platform
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  contest-service:
+    build:
+      context: .
+      dockerfile: contest-service/Dockerfile
+    container_name: contest-service
+    ports:
+      - "4003:4003"
+    environment:
+      PORT: 4003
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: Shamlatha@123
+      DB_NAME: coding_assessment_platform
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: access_secret_key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  submission-service:
+    build:
+      context: .
+      dockerfile: submission-service/Dockerfile
+    container_name: submission-service
+    ports:
+      - "4004:4004"
+    environment:
+      PORT: 4004
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: Shamlatha@123
+      DB_NAME: coding_assessment_platform
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_SECRET: access_secret_key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  judge-service:
+    build:
+      context: .
+      dockerfile: judge-service/Dockerfile
+    container_name: judge-service
+    ports:
+      - "4005:4005"
+    environment:
+      PORT: 4005
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: Shamlatha@123
+      DB_NAME: coding_assessment_platform
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    volumes:
+      # DooD: share host Docker socket so judge can spawn execution containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Share /tmp so Docker daemon can find the temp code files judge creates
+      - /tmp:/tmp
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  leaderboard-service:
+    build:
+      context: .
+      dockerfile: leaderboard-service/Dockerfile
+    container_name: leaderboard-service
+    ports:
+      - "4006:4006"
+    environment:
+      PORT: 4006
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: Shamlatha@123
+      DB_NAME: coding_assessment_platform
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_SECRET: access_secret_key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+# ─── Volumes ─────────────────────────────────────────────────────────────────
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:
