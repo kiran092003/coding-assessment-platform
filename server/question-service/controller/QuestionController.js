@@ -4,16 +4,18 @@ const { client } = require("../config/redis");
 const CreateQuestion = async (req, res) => {
     try {
 
-        const { title, description, difficluty } = req.body;
+        const { title, description, difficluty, return_type, params } = req.body;
 
-        if (!title || !description || !difficluty) {
-            return res.status(400).json({ error: "Required fields missing" });
+        if (!title || !description || !difficluty || !return_type) {
+            return res.status(400).json({ error: "Required fields missing (title, description, difficluty, return_type)" });
         }
 
         const question = await questionService.createQuestion(
             title.trim(),
             description.trim(),
             difficluty.trim(),
+            return_type.trim(),
+            (params || '').trim(),
             req.user.id
         );
 
@@ -77,9 +79,9 @@ const UpdateQuestion = async (req, res) => {
     try {
 
         const { id } = req.params;
-        const { title, description, difficluty } = req.body;
+        const { title, description, difficluty, return_type, params } = req.body;
 
-        await questionService.updateQuestion(id, title, description, difficluty, req.user.id);
+        await questionService.updateQuestion(id, title, description, difficluty, return_type, params, req.user.id);
 
         await Promise.all([
             client.del(`question:${id}`),

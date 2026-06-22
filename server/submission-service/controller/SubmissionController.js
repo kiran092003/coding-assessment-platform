@@ -18,8 +18,12 @@ const CreateSubmission = async (req, res) => {
             contestId || null
         );
 
-        // Invalidate the user's submission history for this question
-        await client.del(`submissions:user:${req.user.id}:question:${questionId}`);
+        // Invalidate the user's submission history for this question (both practice and contest)
+        await Promise.all([
+            client.del(`submissions:user:${req.user.id}:question:${questionId}`),
+            contestId ? client.del(`submissions:user:${req.user.id}:question:${questionId}:contest:${contestId}`) : Promise.resolve(),
+            client.del(`submissions:user:${req.user.id}:all`),
+        ]);
 
         res.status(201).json({ message: "Submission created", submissionId: result.insertId });
 
@@ -42,8 +46,11 @@ const GetSubmissionById = async (req, res) => {
 
         const submission = await submissionService.getSubmissionById(id, req.user.id);
 
-        // Short TTL — submission status changes as judge processes it
-        await client.set(cacheKey, JSON.stringify(submission), { EX: 10 });
+        // Only cache terminal statuses — PENDING/RUNNING change rapidly so don't cache them
+        const TERMINAL = ['ACCEPTED', 'WRONG_ANSWER', 'COMPILATION_ERROR', 'TIME_LIMIT_EXCEEDED', 'MEMORY_LIMIT_EXCEEDED', 'RUNTIME_ERROR'];
+        if (TERMINAL.includes(submission.status)) {
+            await client.set(cacheKey, JSON.stringify(submission), { EX: 300 });
+        }
 
         res.status(200).json(submission);
 
@@ -56,7 +63,10 @@ const GetSubmissionsByUserAndQuestion = async (req, res) => {
     try {
 
         const { questionId } = req.params;
-        const cacheKey = `submissions:user:${req.user.id}:question:${questionId}`;
+        const { contestId } = req.query;
+        const cacheKey = contestId
+            ? `submissions:user:${req.user.id}:question:${questionId}:contest:${contestId}`
+            : `submissions:user:${req.user.id}:question:${questionId}`;
 
         const cachedData = await client.get(cacheKey);
 
@@ -65,7 +75,7 @@ const GetSubmissionsByUserAndQuestion = async (req, res) => {
             return res.status(200).json(JSON.parse(cachedData));
         }
 
-        const submissions = await submissionService.getSubmissionsByUserAndQuestion(req.user.id, questionId);
+        const submissions = await submissionService.getSubmissionsByUserAndQuestion(req.user.id, questionId, contestId || null);
 
         await client.set(cacheKey, JSON.stringify(submissions), { EX: 60 });
 
@@ -116,10 +126,26 @@ const DeleteSubmission = async (req, res) => {
     }
 };
 
+const GetMyAllSubmissions = async (req, res) => {
+    try {
+        const cacheKey = `submissions:user:${req.user.id}:all`;
+        const cachedData = await client.get(cacheKey);
+        if (cachedData) {
+            return res.status(200).json(JSON.parse(cachedData));
+        }
+        const submissions = await submissionService.getAllSubmissionsByUser(req.user.id);
+        await client.set(cacheKey, JSON.stringify(submissions), { EX: 30 });
+        res.status(200).json(submissions);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     CreateSubmission,
     GetSubmissionById,
     GetSubmissionsByUserAndQuestion,
     GetSubmissionsByQuestion,
-    DeleteSubmission
+    DeleteSubmission,
+    GetMyAllSubmissions
 };

@@ -49,4 +49,12 @@ const getLeaderboard = async (contestId, topN) => {
     return await leaderboardRepository.getLeaderboard(contestId, topN);
 };
 
-module.exports = { handleScoredSubmission, getLeaderboard };
+const getMyEntry = async (contestId, userId) => {
+    return await leaderboardRepository.getUserEntry(contestId, userId);
+};
+
+const recordParticipation = async (contestId, userId, ended = false) => {
+    await leaderboardRepository.upsertParticipant(contestId, userId, ended);
+};
+
+module.exports = { handleScoredSubmission, getLeaderboard, getMyEntry, recordParticipation };

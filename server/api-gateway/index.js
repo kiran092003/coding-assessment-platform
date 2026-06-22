@@ -67,7 +67,7 @@ const proxyOptions = (target) => ({
 });
 
 app.use(
-    ['/api/v1/register', '/api/v1/login', '/api/v1/refresh', '/api/v1/logout'],
+    ['/api/v1/register', '/api/v1/login', '/api/v1/refresh', '/api/v1/logout', '/api/v1/profile'],
     createProxyMiddleware(proxyOptions(AUTH_SERVICE_URL))
 );
 

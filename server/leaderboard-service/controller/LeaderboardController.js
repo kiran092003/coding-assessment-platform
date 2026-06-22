@@ -13,4 +13,36 @@ const GetLeaderboard = async (req, res) => {
     }
 };
 
-module.exports = { GetLeaderboard };
+const GetMyEntry = async (req, res) => {
+    try {
+        const { contestId } = req.params;
+        const userId = req.user.id;
+
+        const entry = await leaderboardService.getMyEntry(contestId, userId);
+        res.status(200).json(entry);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+const RecordStart = async (req, res) => {
+    try {
+        const { contestId } = req.params;
+        await leaderboardService.recordParticipation(contestId, req.user.id, false);
+        res.status(200).json({ ok: true });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+const RecordEnd = async (req, res) => {
+    try {
+        const { contestId } = req.params;
+        await leaderboardService.recordParticipation(contestId, req.user.id, true);
+        res.status(200).json({ ok: true });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+module.exports = { GetLeaderboard, GetMyEntry, RecordStart, RecordEnd };

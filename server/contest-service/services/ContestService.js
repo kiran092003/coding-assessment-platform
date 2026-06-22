@@ -42,7 +42,7 @@ const updateContest = async (id, title, description, startTime, endTime, userId)
         throw new AppError("start_time must be before end_time", 400);
     }
 
-    return await contestRepository.UpdateContest(id, title, description, startTime, endTime);
+    return await contestRepository.UpdateContest(id, title, description, resolvedStart, resolvedEnd);
 };
 
 const deleteContest = async (id, userId) => {
@@ -59,10 +59,24 @@ const deleteContest = async (id, userId) => {
     return await contestRepository.DeleteContest(id);
 };
 
+const registerForContest = async (contestId, userId) => {
+    const contest = await contestRepository.GetContestById(contestId);
+    if (!contest) throw new AppError("Contest not found", 404);
+    if (new Date() > new Date(contest.end_time)) throw new AppError("Contest has ended, registration is closed", 400);
+    await contestRepository.RegisterForContest(contestId, userId);
+    return { message: "Registered successfully" };
+};
+
+const getMyRegistration = async (contestId, userId) => {
+    return await contestRepository.GetMyRegistration(contestId, userId);
+};
+
 module.exports = {
     createContest,
     getAllContests,
     getContestById,
     updateContest,
-    deleteContest
+    deleteContest,
+    registerForContest,
+    getMyRegistration,
 };

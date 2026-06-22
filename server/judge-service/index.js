@@ -9,6 +9,9 @@ const { connectRedis } = require("./config/redis");
 const { connectScoredProducer } = require("./producer/RabbitMQProducer");
 const { getAll: getMetrics } = require("./metrics");
 const { createLogger } = require("../shared/logger/logger");
+const { authenticationMiddleware } = require("./middleware/auth");
+const { judgeSubmission, runCode } = require("./services/JudgeService");
+const judgeRepository = require("./repository/JudgeRepository");
 
 const logger = createLogger("judge-service");
 const app = express();
@@ -32,6 +35,30 @@ app.get("/metrics", (_req, res) => {
         rabbitmqConnected: getRabbitMQStatus(),
         redisConnected: client.isReady,
     });
+});
+
+// ── Synchronous run endpoint (no DB record, first 2 sample test cases only) ──
+app.post("/api/v1/judge/run", authenticationMiddleware, async (req, res) => {
+    const { questionId, language, sourceCode } = req.body;
+
+    if (!questionId || !language || !sourceCode) {
+        return res.status(400).json({ error: "questionId, language, and sourceCode are required" });
+    }
+
+    try {
+        const allCases = await judgeRepository.getTestCasesByQuestionId(questionId);
+        const sampleCases = allCases.slice(0, 2);
+
+        if (sampleCases.length === 0) {
+            return res.status(200).json({ status: "ACCEPTED", passed: 0, total: 0, execution_time_ms: 0 });
+        }
+
+        const result = await runCode(language, sourceCode, sampleCases);
+        res.status(200).json(result);
+    } catch (err) {
+        logger.error("Run endpoint error", { error: err.message });
+        res.status(500).json({ error: "Internal server error" });
+    }
 });
 
 const port = process.env.PORT || 4005;

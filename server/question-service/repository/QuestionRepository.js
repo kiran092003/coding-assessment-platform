@@ -1,13 +1,13 @@
 const pool = require("../db/connect");
 
-const CreateQuestion = async (title, description, difficulty, createdBy) => {
+const CreateQuestion = async (title, description, difficulty, returnType, params, createdBy) => {
 
     const query = `
-        INSERT INTO questions (title, description, difficluty, created_by)
-        VALUES(?,?,?,?)
+        INSERT INTO questions (title, description, difficluty, return_type, params, created_by)
+        VALUES(?,?,?,?,?,?)
     `;
 
-    const [result] = await pool.execute(query, [title, description, difficulty, createdBy]);
+    const [result] = await pool.execute(query, [title, description, difficulty, returnType, params, createdBy]);
 
     return result;
 };
@@ -30,15 +30,15 @@ const GetQuestionById = async (id) => {
     return rows[0];
 };
 
-const UpdateQuestion = async (id, title, description, difficluty) => {
+const UpdateQuestion = async (id, title, description, difficluty, returnType, params) => {
 
     const query = `
         UPDATE questions
-        SET title = ?, description = ?, difficluty = ?
+        SET title = ?, description = ?, difficluty = ?, return_type = ?, params = ?
         WHERE id = ?
     `;
 
-    const [result] = await pool.execute(query, [title, description, difficluty, id]);
+    const [result] = await pool.execute(query, [title, description, difficluty, returnType, params, id]);
 
     return result;
 };
@@ -52,10 +52,4 @@ const DeleteQuestion = async (id) => {
     return result;
 };
 
-module.exports = {
-    CreateQuestion,
-    GetAllQuestions,
-    GetQuestionById,
-    UpdateQuestion,
-    DeleteQuestion
-};
+module.exports = { CreateQuestion, GetAllQuestions, GetQuestionById, UpdateQuestion, DeleteQuestion };

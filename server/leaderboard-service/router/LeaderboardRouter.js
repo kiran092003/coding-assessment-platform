@@ -1,8 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const { GetLeaderboard } = require("../controller/LeaderboardController");
+const { GetLeaderboard, GetMyEntry, RecordStart, RecordEnd } = require("../controller/LeaderboardController");
 const { authenticationMiddleware } = require("../middleware/auth");
 
-router.get("/:contestId", authenticationMiddleware, GetLeaderboard);
+router.get("/:contestId/me",       authenticationMiddleware, GetMyEntry);
+router.post("/:contestId/start",   authenticationMiddleware, RecordStart);
+router.post("/:contestId/end",     authenticationMiddleware, RecordEnd);
+router.get("/:contestId",          authenticationMiddleware, GetLeaderboard);
 
 module.exports = router;

@@ -4,17 +4,17 @@ const { client } = require("../config/redis");
 const CreateContest = async (req, res) => {
     try {
 
-        const { title, description, startTime, endTime } = req.body;
+        const { title, description, start_time, end_time } = req.body;
 
-        if (!title || !description || !startTime || !endTime) {
+        if (!title || !description || !start_time || !end_time) {
             return res.status(400).json({ error: "Required fields missing" });
         }
 
         const contest = await contestService.createContest(
             title.trim(),
             description.trim(),
-            startTime,
-            endTime,
+            start_time,
+            end_time,
             req.user.id
         );
 
@@ -78,9 +78,9 @@ const UpdateContest = async (req, res) => {
     try {
 
         const { id } = req.params;
-        const { title, description, startTime, endTime } = req.body;
+        const { title, description, start_time, end_time } = req.body;
 
-        await contestService.updateContest(id, title, description, startTime, endTime, req.user.id);
+        await contestService.updateContest(id, title, description, start_time, end_time, req.user.id);
 
         await Promise.all([
             client.del(`contest:${id}`),
@@ -113,10 +113,30 @@ const DeleteContest = async (req, res) => {
     }
 };
 
+const RegisterContest = async (req, res) => {
+    try {
+        const result = await contestService.registerForContest(req.params.id, req.user.id);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+const GetMyRegistration = async (req, res) => {
+    try {
+        const result = await contestService.getMyRegistration(req.params.id, req.user.id);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     CreateContest,
     GetAllContests,
     GetContestById,
     UpdateContest,
-    DeleteContest
+    DeleteContest,
+    RegisterContest,
+    GetMyRegistration,
 };

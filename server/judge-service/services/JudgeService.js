@@ -50,7 +50,7 @@ const EXEC_SECURITY_FLAGS = [
     "--memory-swap", `${MEMORY_LIMIT_MB}m`,
     "--cpus", "0.5",
     "--pids-limit", "50",
-    "--read-only"
+    "--tmpfs", "/tmp:exec,size=64m",
 ];
 
 const compileInDocker = (image, compileArgs, tmpDir) => {
@@ -531,6 +531,7 @@ _rl.on('close', () => {
 const prepareExecutable = async (language, sourceCode) => {
     const lang   = normalizeLanguage(language);
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "judge-"));
+    await fs.chmod(tmpDir, 0o777);
 
     const image = DOCKER_IMAGES[lang];
     if (!image) {
@@ -588,12 +589,12 @@ const prepareExecutable = async (language, sourceCode) => {
             const src = hasMain.c(sourceCode) ? sourceCode : (generateCWrapper(sourceCode) || sourceCode);
             await fs.writeFile(path.join(tmpDir, "solution.c"), src);
 
-            const compile = await compileInDocker(image, ["gcc", "solution.c", "-o", "solution", "-lm"], tmpDir);
+            const compile = await compileInDocker(image, ["sh", "-c", "gcc solution.c -o solution -lm && chmod 777 solution"], tmpDir);
             if (compile.error) {
                 await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
                 return { error: "COMPILATION_ERROR", details: compile.details };
             }
-            return { tmpDir, image, execCmd: ["./solution"] };
+            return { tmpDir, image, execCmd: ["sh", "-c", "cp /code/solution /tmp/sol && /tmp/sol"] };
         }
 
         // ── C++ ───────────────────────────────────────────────────────────────
@@ -601,12 +602,12 @@ const prepareExecutable = async (language, sourceCode) => {
             const src = hasMain.cpp(sourceCode) ? sourceCode : (generateCppWrapper(sourceCode) || sourceCode);
             await fs.writeFile(path.join(tmpDir, "solution.cpp"), src);
 
-            const compile = await compileInDocker(image, ["g++", "solution.cpp", "-o", "solution", "-std=c++17"], tmpDir);
+            const compile = await compileInDocker(image, ["sh", "-c", "g++ solution.cpp -o solution -std=c++17 && chmod 777 solution"], tmpDir);
             if (compile.error) {
                 await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
                 return { error: "COMPILATION_ERROR", details: compile.details };
             }
-            return { tmpDir, image, execCmd: ["./solution"] };
+            return { tmpDir, image, execCmd: ["sh", "-c", "cp /code/solution /tmp/sol && /tmp/sol"] };
         }
 
         await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
@@ -706,4 +707,53 @@ const judgeSubmission = async ({ submissionId, userId, questionId, language, sou
     }
 };
 
-module.exports = { judgeSubmission };
+// ─── Synchronous run (no DB, sample test cases only) ─────────────────────────
+
+const runCode = async (language, sourceCode, testCases) => {
+    const prepared = await prepareExecutable(language, sourceCode);
+
+    if (prepared.error) {
+        return {
+            status: prepared.error,
+            passed: 0,
+            total: testCases.length,
+            execution_time_ms: 0,
+            detail: prepared.details || null,
+        };
+    }
+
+    let passed = 0, totalExecTime = 0, status = "ACCEPTED";
+
+    try {
+        for (const tc of testCases) {
+            const result = await execInDocker(
+                prepared.image,
+                prepared.execCmd,
+                prepared.tmpDir,
+                tc.input_data || ""
+            );
+
+            if (result.error) {
+                status = result.error; // TIME_LIMIT_EXCEEDED / RUNTIME_ERROR etc.
+                break;
+            }
+
+            totalExecTime += result.executionTimeMs || 0;
+
+            const actual   = (result.stdout || "").trim().replace(/\r\n/g, "\n");
+            const expected = (tc.expected_output || "").trim().replace(/\r\n/g, "\n");
+
+            if (outputsMatch(actual, expected)) {
+                passed++;
+            } else {
+                status = "WRONG_ANSWER";
+            }
+        }
+    } finally {
+        await fs.rm(prepared.tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+
+    return { status, passed, total: testCases.length, execution_time_ms: totalExecTime };
+};
+
+module.exports = { judgeSubmission, runCode };

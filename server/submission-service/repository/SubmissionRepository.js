@@ -26,15 +26,19 @@ const GetSubmissionById = async (id) => {
     return rows[0];
 };
 
-const GetSubmissionsByUserAndQuestion = async (userId, questionId) => {
+const GetSubmissionsByUserAndQuestion = async (userId, questionId, contestId = null) => {
 
-    const query = `
-        SELECT * FROM submissions
-        WHERE user_id = ? AND question_id = ?
-        ORDER BY submitted_at DESC
-    `;
+    let query, params;
 
-    const [rows] = await pool.execute(query, [userId, questionId]);
+    if (contestId) {
+        query = `SELECT * FROM submissions WHERE user_id = ? AND question_id = ? AND contest_id = ? ORDER BY submitted_at DESC`;
+        params = [userId, questionId, contestId];
+    } else {
+        query = `SELECT * FROM submissions WHERE user_id = ? AND question_id = ? AND contest_id IS NULL ORDER BY submitted_at DESC`;
+        params = [userId, questionId];
+    }
+
+    const [rows] = await pool.execute(query, params);
 
     return rows;
 };
@@ -89,11 +93,28 @@ const UpdateSubmissionStatus = async (
     return result;
 };
 
+const GetAllSubmissionsByUser = async (userId) => {
+    const query = `
+        SELECT s.id, s.question_id, s.language, s.status,
+               s.total_testcases, s.passed_testcases, s.execution_time_ms,
+               s.submitted_at, s.contest_id,
+               q.title AS question_title
+        FROM submissions s
+        LEFT JOIN questions q ON s.question_id = q.id
+        WHERE s.user_id = ?
+        ORDER BY s.submitted_at DESC
+        LIMIT 100
+    `;
+    const [rows] = await pool.execute(query, [userId]);
+    return rows;
+};
+
 module.exports = {
     CreateSubmission,
     GetSubmissionById,
     GetSubmissionsByUserAndQuestion,
     GetSubmissionsByQuestion,
     DeleteSubmission,
-    UpdateSubmissionStatus
+    UpdateSubmissionStatus,
+    GetAllSubmissionsByUser
 };

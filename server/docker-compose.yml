@@ -118,6 +118,7 @@ services:
       DB_PASSWORD: Shamlatha@123
       DB_NAME: coding_assessment_platform
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: access_secret_key
     depends_on:
       mysql:
         condition: service_healthy
@@ -190,6 +191,7 @@ services:
       DB_NAME: coding_assessment_platform
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_SECRET: access_secret_key
     volumes:
       # DooD: share host Docker socket so judge can spawn execution containers
       - /var/run/docker.sock:/var/run/docker.sock
@@ -228,6 +230,21 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../client
+      dockerfile: Dockerfile
+      args:
+        # Empty → axios uses relative URLs → nginx proxies /api/ to api-gateway
+        VITE_API_URL: ""
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      api-gateway:
+        condition: service_started
     restart: unless-stopped
 
 # ─── Volumes ─────────────────────────────────────────────────────────────────

@@ -2,14 +2,19 @@ const questionRepository = require("../repository/QuestionRepository");
 const AppError = require("../utils/AppError");
 
 const VALID_DIFFICULTIES = ["Low", "Medium", "High"];
+const VALID_RETURN_TYPES = ["int", "long long", "double", "bool", "string", "vector<int>", "vector<string>", "vector<vector<int>>", "void"];
 
-const createQuestion = async (title, description, difficulty, userId) => {
+const createQuestion = async (title, description, difficulty, returnType, params, userId) => {
 
     if (!VALID_DIFFICULTIES.includes(difficulty)) {
         throw new AppError("Invalid difficulty. Must be Low, Medium, or High", 400);
     }
 
-    return await questionRepository.CreateQuestion(title, description, difficulty, userId);
+    if (!VALID_RETURN_TYPES.includes(returnType)) {
+        throw new AppError(`Invalid return type. Must be one of: ${VALID_RETURN_TYPES.join(", ")}`, 400);
+    }
+
+    return await questionRepository.CreateQuestion(title, description, difficulty, returnType, params || '', userId);
 };
 
 const getAllQuestions = async () => {
@@ -26,7 +31,7 @@ const getQuestionById = async (id) => {
     return question;
 };
 
-const updateQuestion = async (id, title, description, difficulty, userId) => {
+const updateQuestion = async (id, title, description, difficulty, returnType, params, userId) => {
 
     const question = await questionRepository.GetQuestionById(id);
     if (!question) {
@@ -41,7 +46,16 @@ const updateQuestion = async (id, title, description, difficulty, userId) => {
         throw new AppError("Invalid difficulty. Must be Low, Medium, or High", 400);
     }
 
-    return await questionRepository.UpdateQuestion(id, title, description, difficulty);
+    if (returnType && !VALID_RETURN_TYPES.includes(returnType)) {
+        throw new AppError(`Invalid return type. Must be one of: ${VALID_RETURN_TYPES.join(", ")}`, 400);
+    }
+
+    return await questionRepository.UpdateQuestion(
+        id, title, description,
+        difficulty || question.difficluty,
+        returnType || question.return_type,
+        params !== undefined ? params : question.params
+    );
 };
 
 const deleteQuestion = async (id, userId) => {
@@ -58,10 +72,4 @@ const deleteQuestion = async (id, userId) => {
     return await questionRepository.DeleteQuestion(id);
 };
 
-module.exports = {
-    createQuestion,
-    getAllQuestions,
-    getQuestionById,
-    updateQuestion,
-    deleteQuestion
-};
+module.exports = { createQuestion, getAllQuestions, getQuestionById, updateQuestion, deleteQuestion };

@@ -6,11 +6,13 @@ const {
     GetSubmissionById,
     GetSubmissionsByUserAndQuestion,
     GetSubmissionsByQuestion,
-    DeleteSubmission
+    DeleteSubmission,
+    GetMyAllSubmissions
 } = require("../controller/SubmissionController");
 const { authenticationMiddleware, authorizeRole } = require("../middleware/auth");
 const { rateLimitSubmission } = require("../middleware/rateLimitSubmission");
 
+routers.route("/me").get(authenticationMiddleware, GetMyAllSubmissions);
 routers.route("/create").post(authenticationMiddleware, rateLimitSubmission, CreateSubmission);
 routers.route("/getById/:id").get(authenticationMiddleware, GetSubmissionById);
 routers.route("/mySubmissions/:questionId").get(authenticationMiddleware, GetSubmissionsByUserAndQuestion);

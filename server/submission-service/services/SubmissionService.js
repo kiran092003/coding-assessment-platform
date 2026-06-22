@@ -47,8 +47,8 @@ const getSubmissionById = async (id, userId) => {
     return submission;
 };
 
-const getSubmissionsByUserAndQuestion = async (userId, questionId) => {
-    return await submissionRepository.GetSubmissionsByUserAndQuestion(userId, questionId);
+const getSubmissionsByUserAndQuestion = async (userId, questionId, contestId = null) => {
+    return await submissionRepository.GetSubmissionsByUserAndQuestion(userId, questionId, contestId);
 };
 
 const getSubmissionsByQuestion = async (questionId) => {
@@ -70,10 +70,15 @@ const deleteSubmission = async (id, userId) => {
     return await submissionRepository.DeleteSubmission(id);
 };
 
+const getAllSubmissionsByUser = async (userId) => {
+    return await submissionRepository.GetAllSubmissionsByUser(userId);
+};
+
 module.exports = {
     createSubmission,
     getSubmissionById,
     getSubmissionsByUserAndQuestion,
     getSubmissionsByQuestion,
-    deleteSubmission
+    deleteSubmission,
+    getAllSubmissionsByUser
 };

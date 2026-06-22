@@ -81,8 +81,13 @@ const refreshAccessToken = async (refreshToken) => {
 
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
+    const user = await userRepository.GetUserById(decoded.id);
+    if (!user) {
+        throw new AppError("User not found", 403);
+    }
+
     const accessToken = jwt.sign(
-        { id: decoded.id },
+        { id: user.id, email: user.email, name: user.name, role: user.role },
         process.env.JWT_SECRET,
         { expiresIn: "15m" }
     );
@@ -94,9 +99,41 @@ const logout = async (refreshToken) => {
     await userRepository.DeleteRefreshToken(refreshToken);
 };
 
+const getProfile = async (userId) => {
+    const user = await userRepository.GetUserById(userId);
+    if (!user) throw new AppError('User not found', 404);
+    const { password: _pwd, ...profile } = user;
+    return profile;
+};
+
+const updateProfile = async (userId, name) => {
+    if (!name || name.trim().length < 2) throw new AppError('Name must be at least 2 characters', 400);
+    const existing = await userRepository.GetUserByName(name.trim());
+    if (existing && existing.id !== userId) throw new AppError('Name already taken', 400);
+    await userRepository.UpdateUserName(userId, name.trim());
+    const user = await userRepository.GetUserById(userId);
+    const { password: _pwd, ...profile } = user;
+    return profile;
+};
+
+const changePassword = async (userId, currentPassword, newPassword) => {
+    const user = await userRepository.GetUserById(userId);
+    if (!user) throw new AppError('User not found', 404);
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) throw new AppError('Current password is incorrect', 400);
+    if (!PASSWORD_REGEX.test(newPassword)) {
+        throw new AppError('Password must contain at least 8 characters, 1 uppercase, 1 lowercase, 2 numbers, and 1 special character', 400);
+    }
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await userRepository.UpdateUserPassword(userId, hashed);
+};
+
 module.exports = {
     register,
     login,
     refreshAccessToken,
-    logout
+    logout,
+    getProfile,
+    updateProfile,
+    changePassword
 };

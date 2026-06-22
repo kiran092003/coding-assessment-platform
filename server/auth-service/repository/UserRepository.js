@@ -33,6 +33,16 @@ const GetUserByEmail = async (email) => {
     }
 };
 
+const GetUserById = async (id) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+        return rows[0];
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+};
+
 // Refresh tokens stored in Redis instead of DB — auto-expires after 7 days
 const SaveRefreshToken = async (userId, token) => {
     await client.set(`refresh:${token}`, userId.toString(), { EX: REFRESH_TOKEN_TTL });
@@ -47,11 +57,34 @@ const DeleteRefreshToken = async (token) => {
     await client.del(`refresh:${token}`);
 };
 
+const UpdateUserName = async (id, name) => {
+    try {
+        const [result] = await pool.query('UPDATE users SET name = ? WHERE id = ?', [name, id]);
+        return result;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+};
+
+const UpdateUserPassword = async (id, hashedPassword) => {
+    try {
+        const [result] = await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
+        return result;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+};
+
 module.exports = {
     CreateUser,
     GetUserByName,
     GetUserByEmail,
+    GetUserById,
     SaveRefreshToken,
     GetRefreshToken,
-    DeleteRefreshToken
+    DeleteRefreshToken,
+    UpdateUserName,
+    UpdateUserPassword
 };

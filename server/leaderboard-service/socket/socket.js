@@ -1,4 +1,5 @@
 const { Server } = require("socket.io");
+const leaderboardRepository = require("../repository/LeaderboardRepository");
 
 let io;
 
@@ -11,9 +12,16 @@ const initSocket = (httpServer) => {
         console.log(`[Socket.IO] Client connected: ${socket.id}`);
 
         // Frontend joins a contest room to receive live leaderboard updates
-        socket.on("joinContest", (contestId) => {
+        socket.on("joinContest", async (contestId) => {
             socket.join(`leaderboard:${contestId}`);
             console.log(`[Socket.IO] Client ${socket.id} joined leaderboard:${contestId}`);
+            // Send current leaderboard immediately so the page doesn't wait for next event
+            try {
+                const current = await leaderboardRepository.getLeaderboard(contestId, 50);
+                socket.emit("leaderboardUpdate", current);
+            } catch (err) {
+                console.error("[Socket.IO] Failed to send initial leaderboard", err.message);
+            }
         });
 
         socket.on("leaveContest", (contestId) => {

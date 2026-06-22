@@ -68,4 +68,37 @@ const Logout = async (req, res) => {
     }
 };
 
-module.exports = { CreateUser, Login, RefreshAccessToken, Logout };
+const GetProfile = async (req, res) => {
+    try {
+        const profile = await userService.getProfile(req.user.id);
+        res.status(200).json(profile);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+const UpdateProfile = async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) return res.status(400).json({ error: 'Name is required' });
+        const profile = await userService.updateProfile(req.user.id, name);
+        res.status(200).json({ message: 'Profile updated', ...profile });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+const ChangePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+        }
+        await userService.changePassword(req.user.id, currentPassword, newPassword);
+        res.status(200).json({ message: 'Password changed successfully' });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+module.exports = { CreateUser, Login, RefreshAccessToken, Logout, GetProfile, UpdateProfile, ChangePassword };
