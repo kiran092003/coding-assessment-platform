@@ -32,10 +32,7 @@ export default function Pagination({
   const pages = pageList(page, pageCount)
 
   return (
-    <div
-      className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3"
-      style={{ background: 'var(--surface-low)', borderColor: 'var(--outline-variant)' }}
-    >
+    <div className="tbl-footer flex flex-wrap items-center justify-between gap-3 px-4 py-3">
       <div className="flex items-center gap-4">
         <span className="label">Showing {from}–{to} of {total} {label}</span>
 

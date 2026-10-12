@@ -242,7 +242,7 @@ export default function MapQuestionsPage() {
   )
 
   return (
-    <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="page-fill animate-fade-in flex flex-col">
 
       {/* Page header */}
       <div className="flex items-center justify-between mb-4">
@@ -253,7 +253,7 @@ export default function MapQuestionsPage() {
       </div>
 
       {/* Two-panel layout */}
-      <div className="card overflow-hidden flex" style={{ height: 'calc(100% - 64px)' }}>
+      <div className="card overflow-hidden flex min-h-0 flex-1">
 
         {/* ── Left: contest list ─────────────────────────────────────── */}
         <div className="w-64 flex-shrink-0 border-r border-surface-container-high flex flex-col">

@@ -52,12 +52,17 @@ export default function AppLayout() {
             <Outlet />
           </div>
         ) : (
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            <div className="w-full max-w-7xl mx-auto flex-1 px-container-padding py-container-padding">
-              <Outlet />
-            </div>
+          <>
+            {/* Only this scrolls. The footer is a sibling, not a child, so it
+                stays pinned to the bottom of the viewport instead of riding
+                up and down with the amount of content on the page. */}
+            <main className="min-h-0 flex-1 overflow-y-auto">
+              <div className="w-full max-w-7xl mx-auto px-container-padding py-container-padding">
+                <Outlet />
+              </div>
+            </main>
             <Footer />
-          </main>
+          </>
         )}
       </div>
     </div>

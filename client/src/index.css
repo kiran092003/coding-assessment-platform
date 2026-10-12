@@ -70,6 +70,13 @@
     /* True green — Accepted verdicts only */
     --success:     #34d399;
     --success-dim: rgba(52, 211, 153, 0.12);
+
+    /* App shell metrics. The top bar and footer are fixed furniture; a page
+       that wants to fill the remaining space subtracts them via .page-fill
+       rather than hardcoding a number that drifts when either changes. */
+    --nav-h:       4rem;    /* top bar          */
+    --footer-h:    3rem;    /* app footer       */
+    --page-pad-y:  3rem;    /* 24px top + 24px bottom of the content wrapper */
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -280,7 +287,19 @@
     background: var(--surface-low);
     border: 1px solid var(--outline-variant);
     border-radius: 8px;
-    overflow: hidden;
+    /* Not `hidden`: that would create a scroll container and break the
+       sticky pagination bar below. `clip` crops identically without one. */
+    overflow: clip;
+  }
+
+  /* Pagination pinned to the bottom of the scroll viewport, so it stays put
+     whether the table holds 3 rows or 300 instead of sliding off-screen. */
+  .tbl-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--surface-low);
+    border-top: 1px solid var(--outline-variant);
   }
   .tbl-head {
     background: var(--surface-high);
@@ -395,6 +414,12 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--on-surface-variant);
+  }
+
+  /* Fills the space left between the top bar and the footer. */
+  .page-fill {
+    height: calc(100vh - var(--nav-h) - var(--footer-h) - var(--page-pad-y));
+    min-height: 20rem;
   }
 
   /* ─── Dot grid background ────────────────────────────────── */
