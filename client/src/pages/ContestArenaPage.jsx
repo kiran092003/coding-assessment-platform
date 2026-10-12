@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useBlocker } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
+import { MONACO_THEME, registerMonacoTheme, monacoOptions } from '@/lib/monacoTheme'
 import { format } from 'date-fns'
 import { useContest, useContestQuestions } from '@/features/contests/hooks/useContests'
 import { useQuestion } from '@/features/questions/hooks/useQuestions'
@@ -100,10 +101,12 @@ function getDiffVariant(d) {
 }
 
 function getStatusColor(s) {
-  if (s === 'ACCEPTED') return 'text-emerald-400'
-  if (s === 'WRONG_ANSWER' || s === 'COMPILATION_ERROR') return 'text-red-400'
-  if (s === 'PENDING' || s === 'RUNNING') return 'text-yellow-400'
-  return 'text-gray-400'
+  if (s === 'ACCEPTED') return 'text-success-400'
+  if (s === 'WRONG_ANSWER' || s === 'RUNTIME_ERROR') return 'text-error'
+  if (s === 'TIME_LIMIT_EXCEEDED') return 'text-tertiary'
+  if (s === 'COMPILATION_ERROR' || s === 'MEMORY_LIMIT_EXCEEDED') return 'text-secondary'
+  if (s === 'PENDING' || s === 'RUNNING') return 'text-tertiary'
+  return 'text-on-surface-variant'
 }
 
 const formatTime = (ms) => {
@@ -115,9 +118,9 @@ const formatTime = (ms) => {
 // ── Logo ──────────────────────────────────────────────────────────────────────
 const LogoIcon = () => (
   <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
-    <path d="M14 2L25.5 8.5V19.5L14 26L2.5 19.5V8.5L14 2Z" stroke="#10B981" strokeWidth="1.5" />
-    <path d="M10 10l-4 4 4 4M18 10l4 4-4 4" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M15.5 9l-3 10" stroke="#34D399" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M14 2L25.5 8.5V19.5L14 26L2.5 19.5V8.5L14 2Z" stroke="#adc6ff" strokeWidth="1.5" />
+    <path d="M10 10l-4 4 4 4M18 10l4 4-4 4" stroke="#adc6ff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M15.5 9l-3 10" stroke="#d8e2ff" strokeWidth="1.5" strokeLinecap="round" />
   </svg>
 )
 
@@ -125,12 +128,12 @@ const LogoIcon = () => (
 function ResultPanel({ result, isPolling, isRunning, mode, onClose }) {
   if (!result && !isPolling && !isRunning) return null
   return (
-    <div className="border-t border-[#20233A] bg-[#0E0F18]">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[#20233A]">
+    <div className="border-t border-outline-variant bg-surface-container-low">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant">
         <span className="text-sm font-medium text-gray-300">
           {mode === 'run' ? 'Test Result (sample cases)' : 'Submission Result'}
         </span>
-        <button onClick={onClose} className="text-gray-500 hover:text-white text-lg leading-none">×</button>
+        <button onClick={onClose} className="text-gray-500 hover:text-on-surface text-lg leading-none">×</button>
       </div>
       <div className="px-4 py-3 min-h-[72px]">
         {(isPolling || isRunning) && !result ? (
@@ -153,7 +156,7 @@ function ResultPanel({ result, isPolling, isRunning, mode, onClose }) {
                 const t = result.total  ?? result.total_testcases
                 if (t > 0) return <div className="flex items-center gap-2"><span className="text-gray-500">Tests passed</span><span className={p === t ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium'}>{p} / {t}</span></div>
               })()}
-              {result.execution_time_ms > 0 && <div className="flex items-center gap-2"><span className="text-gray-500">Runtime</span><span className="text-white font-medium">{result.execution_time_ms} ms</span></div>}
+              {result.execution_time_ms > 0 && <div className="flex items-center gap-2"><span className="text-gray-500">Runtime</span><span className="text-on-surface font-medium">{result.execution_time_ms} ms</span></div>}
             </div>
           </div>
         ) : null}
@@ -167,14 +170,14 @@ function ExitDialog({ onStay, onLeave }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onStay} />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-[#20233A] bg-[#0E0F18] shadow-[0_24px_64px_rgba(0,0,0,0.8)] p-6 animate-fade-in">
+      <div className="relative z-10 w-full max-w-sm rounded-xl border border-outline-variant bg-surface-container-low shadow-level-4 p-6 animate-fade-in">
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 mx-auto mb-4">
           <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h3 className="text-white font-bold text-lg text-center mb-1">End the contest?</h3>
-        <p className="text-[#8890B0] text-sm text-center mb-6">
+        <h3 className="text-on-surface font-bold text-lg text-center mb-1">End the contest?</h3>
+        <p className="text-on-surface-variant text-sm text-center mb-6">
           You'll leave the arena. Make sure you've submitted all your solutions before exiting.
         </p>
         <div className="flex gap-3">
@@ -331,8 +334,8 @@ export default function ContestArenaPage() {
   if (regData && !regData.registered) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4" style={{ background: 'var(--bg-base)' }}>
       <div className="text-6xl">🔐</div>
-      <h2 className="text-white text-2xl font-bold">Registration Required</h2>
-      <p className="text-[#8890B0] text-sm max-w-xs">You need to register for this contest before you can enter the arena.</p>
+      <h2 className="text-on-surface text-2xl font-bold">Registration Required</h2>
+      <p className="text-on-surface-variant text-sm max-w-xs">You need to register for this contest before you can enter the arena.</p>
       <button
         onClick={() => { exitConfirmedRef.current = true; navigate(`/contests/${contestId}`) }}
         className="mt-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-secondary"
@@ -345,7 +348,7 @@ export default function ContestArenaPage() {
   if (contest && new Date() < new Date(contest.start_time)) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 text-center px-4" style={{ background: 'var(--bg-base)' }}>
       <div className="text-6xl">🔒</div>
-      <h2 className="text-white text-2xl font-bold">Contest hasn't started yet</h2>
+      <h2 className="text-on-surface text-2xl font-bold">Contest hasn't started yet</h2>
       <button onClick={() => { exitConfirmedRef.current = true; navigate(`/contests/${contestId}`) }} className="mt-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-secondary">
         ← Back to Contest
       </button>
@@ -357,17 +360,17 @@ export default function ContestArenaPage() {
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg-base)' }}>
 
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between h-14 px-5 border-b border-[#20233A] bg-[#06070C] flex-shrink-0">
+      <div className="flex items-center justify-between h-14 px-5 border-b border-outline-variant bg-surface flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <LogoIcon />
           <div className="min-w-0">
-            <p className="text-[10px] text-[#454A68] uppercase tracking-widest font-semibold leading-none mb-0.5">Contest Arena</p>
-            <p className="text-white text-sm font-bold truncate max-w-[220px]">{contest?.title || '…'}</p>
+            <p className="text-[10px] text-outline uppercase tracking-widest font-semibold leading-none mb-0.5">Contest Arena</p>
+            <p className="text-on-surface text-sm font-bold truncate max-w-[220px]">{contest?.title || '…'}</p>
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-0.5">
-          <p className="text-[10px] text-[#454A68] uppercase tracking-widest font-semibold">Time Left</p>
+          <p className="text-[10px] text-outline uppercase tracking-widest font-semibold">Time Left</p>
           <span className={`font-mono text-xl font-bold tabular-nums ${timerColor}`}>{formatTime(timeLeft)}</span>
         </div>
 
@@ -386,9 +389,9 @@ export default function ContestArenaPage() {
       <div className="flex flex-1 min-h-0">
 
         {/* ── Problems sidebar ──────────────────────────────────────────────── */}
-        <div className="w-52 flex flex-col border-r border-[#20233A] bg-[#06070C] flex-shrink-0">
-          <div className="px-4 py-2.5 border-b border-[#20233A]">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-[#454A68]">Problems</span>
+        <div className="w-52 flex flex-col border-r border-outline-variant bg-surface flex-shrink-0">
+          <div className="px-4 py-2.5 border-b border-outline-variant">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-outline">Problems</span>
           </div>
           <div className="flex-1 overflow-y-auto py-1">
             {questions.map((q, idx) => {
@@ -400,11 +403,11 @@ export default function ContestArenaPage() {
                   onClick={() => handleQuestionSwitch(q.id)}
                   className={`w-full text-left px-4 py-3 flex items-center gap-2.5 transition-colors border-l-2 ${
                     active
-                      ? 'bg-emerald-500/10 text-white border-emerald-500'
-                      : 'text-[#8890B0] hover:bg-[#0E0F18] hover:text-white border-transparent'
+                      ? 'bg-emerald-400/10 text-on-surface border-emerald-400'
+                      : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface border-transparent'
                   }`}
                 >
-                  <span className="text-xs font-mono text-[#454A68] flex-shrink-0 w-5">{String(idx + 1).padStart(2, '0')}</span>
+                  <span className="text-xs font-mono text-outline flex-shrink-0 w-5">{String(idx + 1).padStart(2, '0')}</span>
                   <span className="text-sm font-medium truncate flex-1">{q.title}</span>
                   {solved && (
                     <svg className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -418,14 +421,14 @@ export default function ContestArenaPage() {
         </div>
 
         {/* ── Description / Submissions panel ──────────────────────────────── */}
-        <div className="w-[38%] flex flex-col border-r border-[#20233A] min-h-0">
-          <div className="flex border-b border-[#20233A] flex-shrink-0 bg-[#0E0F18]">
+        <div className="w-[38%] flex flex-col border-r border-outline-variant min-h-0">
+          <div className="flex border-b border-outline-variant flex-shrink-0 bg-surface-container-low">
             {['description', 'submissions'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-5 py-3 text-sm font-medium capitalize transition-colors border-b-2 ${
-                  activeTab === tab ? 'text-white border-emerald-500' : 'text-gray-400 border-transparent hover:text-white'
+                  activeTab === tab ? 'text-on-surface border-emerald-400' : 'text-gray-400 border-transparent hover:text-on-surface'
                 }`}
               >
                 {tab}
@@ -439,7 +442,7 @@ export default function ContestArenaPage() {
             ) : activeTab === 'description' ? (
               <>
                 <div>
-                  <h1 className="text-xl font-bold text-white mb-2">{question.title}</h1>
+                  <h1 className="text-headline-sm text-on-surface mb-2">{question.title}</h1>
                   <Badge variant={getDiffVariant(question.difficluty)}>
                     {question.difficluty === 'Low' ? 'Easy' : question.difficluty === 'High' ? 'Hard' : 'Medium'}
                   </Badge>
@@ -449,8 +452,8 @@ export default function ContestArenaPage() {
                   <div className="space-y-4">
                     {sampleCases.map((tc, idx) => (
                       <div key={tc.id}>
-                        <p className="text-white font-semibold text-sm mb-2">Example {idx + 1}:</p>
-                        <div className="bg-[#06070C] rounded-lg p-4 space-y-2 border border-[#20233A]">
+                        <p className="text-on-surface font-semibold text-sm mb-2">Example {idx + 1}:</p>
+                        <div className="bg-surface rounded-lg p-4 space-y-2 border border-outline-variant">
                           <div className="font-mono text-sm">
                             <span className="text-gray-400 font-sans font-medium">Input: </span>
                             <span className="text-gray-100">{tc.input_data}</span>
@@ -464,17 +467,17 @@ export default function ContestArenaPage() {
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-gray-500 border-t border-[#20233A] pt-4">All submissions are judged against hidden test cases.</p>
+                <p className="text-xs text-gray-500 border-t border-outline-variant pt-4">All submissions are judged against hidden test cases.</p>
               </>
             ) : (
               <div>
-                <h2 className="text-white font-semibold mb-4">My Submissions</h2>
+                <h2 className="text-on-surface font-semibold mb-4">My Submissions</h2>
                 {!mySubmissions || mySubmissions.length === 0 ? (
                   <p className="text-gray-500 text-sm">No submissions yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {mySubmissions.map(sub => (
-                      <div key={sub.id} className="bg-[#06070C] border border-[#20233A] rounded-lg px-4 py-3 flex items-center justify-between">
+                      <div key={sub.id} className="bg-surface border border-outline-variant rounded-lg px-4 py-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className={`text-sm font-medium ${getStatusColor(sub.status)}`}>{sub.status}</span>
                           <span className="text-gray-500 text-xs">{sub.language}</span>
@@ -495,11 +498,11 @@ export default function ContestArenaPage() {
 
         {/* ── Editor panel ──────────────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-[#20233A] bg-[#0E0F18] flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant bg-surface-container-low flex-shrink-0">
             <select
               value={language}
               onChange={e => handleLanguageChange(e.target.value)}
-              className="bg-[#171828] border border-[#2E3150] text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+              className="input-field h-8 w-auto cursor-pointer py-0 pl-2 pr-8 text-label-md"
             >
               {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
@@ -507,25 +510,20 @@ export default function ContestArenaPage() {
               <button
                 onClick={handleRun}
                 disabled={isJudging}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium bg-[#171828] hover:bg-[#3a3a3a] text-white disabled:opacity-50 border border-[#2E3150] transition-colors"
+                className="btn-secondary h-8"
               >
                 {isJudging && mode === 'run' ? <Spinner size="sm" /> : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>play_arrow</span>
                 )}
                 Run
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={isJudging || contestEnded}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
+                className="btn-primary h-8"
               >
                 {isJudging && mode === 'submit' ? <Spinner size="sm" /> : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
                 )}
                 Submit
               </button>
@@ -538,14 +536,9 @@ export default function ContestArenaPage() {
               language={MONACO_LANG[language]}
               value={code}
               onChange={val => setCodeMap(prev => ({ ...prev, [activeQId]: val || '' }))}
-              theme="vs-dark"
-              options={{
-                fontSize: 14, minimap: { enabled: false }, scrollBeyondLastLine: false,
-                padding: { top: 16, bottom: 16 }, lineNumbers: 'on', renderLineHighlight: 'line',
-                tabSize: 4, automaticLayout: true,
-                fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                fontLigatures: true, cursorBlinking: 'smooth', smoothScrolling: true,
-              }}
+              theme={MONACO_THEME}
+              beforeMount={registerMonacoTheme}
+              options={monacoOptions}
             />
           </div>
 
@@ -563,11 +556,11 @@ export default function ContestArenaPage() {
       {/* ── Contest Ended Overlay ────────────────────────────────────────────── */}
       {contestEnded && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-[#20233A] bg-[#0E0F18] shadow-[0_24px_64px_rgba(0,0,0,0.8)] p-8 text-center space-y-4">
-            <div className="text-5xl">⏱</div>
-            <h3 className="text-white font-bold text-xl">Time's up!</h3>
-            <p className="text-[#8890B0] text-sm">The contest has ended. Your submissions have been recorded.</p>
-            <button onClick={doExit} className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+          <div className="w-full max-w-sm rounded-xl border border-outline-variant bg-surface-container-low shadow-level-4 p-8 text-center space-y-4">
+            <div><span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--tertiary)' }}>timer</span></div>
+            <h3 className="text-on-surface font-bold text-xl">Time's up!</h3>
+            <p className="text-on-surface-variant text-sm">The contest has ended. Your submissions have been recorded.</p>
+            <button onClick={doExit} className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary text-on-primary hover:opacity-90 text-on-surface transition-colors">
               View Results
             </button>
           </div>

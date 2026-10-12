@@ -1,6 +1,11 @@
 const contestQuestionService = require("../services/ContestQuestionService");
 const { client } = require("../config/redis");
 
+const invalidateContest = async (contestId) => {
+    const keys = await client.keys(`contest:questions:${contestId}:*`);
+    if (keys.length) await client.del(keys);
+};
+
 const AddQuestionToContest = async (req, res) => {
     try {
 
@@ -12,7 +17,7 @@ const AddQuestionToContest = async (req, res) => {
 
         await contestQuestionService.addQuestionToContest(contestId, questionId, points ?? null);
 
-        await client.del(`contest:questions:${contestId}`);
+        await invalidateContest(contestId);
 
         res.status(201).json({ message: "Question mapped to contest successfully" });
 
@@ -29,7 +34,7 @@ const UpdateQuestionPoints = async (req, res) => {
 
         await contestQuestionService.updateQuestionPoints(contestId, questionId, points ?? null);
 
-        await client.del(`contest:questions:${contestId}`);
+        await invalidateContest(contestId);
 
         res.status(200).json({ message: "Points updated successfully" });
 
@@ -42,18 +47,18 @@ const GetQuestionsByContest = async (req, res) => {
     try {
 
         const { contestId } = req.params;
-        const cacheKey = `contest:questions:${contestId}`;
+        const scope = req.user?.role === "ADMIN" ? "admin" : `user:${req.user.id}`;
+        const cacheKey = `contest:questions:${contestId}:${scope}`;
 
         const cachedData = await client.get(cacheKey);
 
         if (cachedData) {
-            console.log(`Serving questions for contest ${contestId} from Redis`);
             return res.status(200).json(JSON.parse(cachedData));
         }
 
-        const questions = await contestQuestionService.getQuestionsByContest(contestId);
+        const questions = await contestQuestionService.getQuestionsByContest(contestId, req.user);
 
-        await client.set(cacheKey, JSON.stringify(questions), { EX: 300 });
+        await client.set(cacheKey, JSON.stringify(questions), { EX: 30 });
 
         res.status(200).json(questions);
 
@@ -69,7 +74,7 @@ const RemoveQuestionFromContest = async (req, res) => {
 
         await contestQuestionService.removeQuestionFromContest(contestId, questionId);
 
-        await client.del(`contest:questions:${contestId}`);
+        await invalidateContest(contestId);
 
         res.status(200).json({ message: "Question removed from contest successfully" });
 

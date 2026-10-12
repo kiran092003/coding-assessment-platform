@@ -19,14 +19,34 @@ const {
 
 app.use(cors());
 
+/* The gateway sits behind the frontend's nginx, so without this every request
+   appears to come from nginx's address and the per-IP limiter throttles all
+   users collectively — one busy client could lock out the whole platform. */
+app.set('trust proxy', 1);
+
+/* General traffic. Polling a submission's verdict alone costs several
+   requests per second, so the old 200-per-15-minutes ceiling was reachable
+   during normal use. */
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
+    windowMs: 60 * 1000,
+    max: 300,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
 });
 app.use(limiter);
+
+/* Authentication is the one surface worth rate-limiting hard: this is what
+   makes credential stuffing and password guessing impractical. */
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: 'Too many authentication attempts. Please try again later.' },
+});
+app.use(['/api/v1/login', '/api/v1/register'], authLimiter);
 
 app.use((req, _res, next) => {
     logger.info(`${req.method} ${req.originalUrl}`);

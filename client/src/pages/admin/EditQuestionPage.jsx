@@ -6,7 +6,7 @@ import Spinner from '@/components/ui/Spinner'
 const RETURN_TYPES = ['int', 'long long', 'double', 'bool', 'string', 'vector<int>', 'vector<string>', 'vector<vector<int>>', 'void']
 
 const FieldLabel = ({ children }) => (
-  <label className="block text-sm font-medium mb-1.5" style={{ color: '#8890B0' }}>{children}</label>
+  <label className="block text-sm font-medium mb-1.5" style={{ color: '#c2c6d6' }}>{children}</label>
 )
 
 export default function EditQuestionPage() {
@@ -39,14 +39,14 @@ export default function EditQuestionPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center gap-4">
-        <Link to="/admin/questions" className="p-2 rounded-lg hover:bg-[#171828] text-[#8890B0] hover:text-white transition-colors">
+        <Link to="/admin/questions" className="p-2 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-white">Edit Question</h1>
-          <p className="text-[#454A68] text-sm truncate max-w-md">{question?.title}</p>
+          <h1 className="text-headline-sm text-on-surface">Edit Question</h1>
+          <p className="text-outline text-sm truncate max-w-md">{question?.title}</p>
         </div>
       </div>
 
@@ -102,7 +102,7 @@ export default function EditQuestionPage() {
             placeholder='e.g.  string s   or   vector<int>& nums, int target'
             className="input-field font-mono text-xs"
           />
-          <p className="text-[#454A68] text-xs mt-1.5">
+          <p className="text-outline text-xs mt-1.5">
             Write in C++ style — auto-converted to Java/Python/JS in the editor template.
           </p>
         </div>

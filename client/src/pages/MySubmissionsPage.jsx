@@ -5,15 +5,30 @@ import { useAllMySubmissions } from '@/features/submissions/hooks/useSubmissions
 import Spinner from '@/components/ui/Spinner'
 import Badge from '@/components/ui/Badge'
 
+/* Verdict styling follows the design system's semantics: true green for a
+   pass, red for a wrong answer, orange for a time limit, and indigo for
+   system-level failures (compile / memory) so logic errors stay visually
+   distinct from infrastructure errors. */
 const STATUS_META = {
-  ACCEPTED:             { label: 'Accepted',           variant: 'success' },
-  WRONG_ANSWER:         { label: 'Wrong Answer',        variant: 'danger'  },
-  COMPILATION_ERROR:    { label: 'Compile Error',       variant: 'warning' },
-  TIME_LIMIT_EXCEEDED:  { label: 'Time Limit',          variant: 'warning' },
-  MEMORY_LIMIT_EXCEEDED:{ label: 'Memory Limit',        variant: 'warning' },
-  RUNTIME_ERROR:        { label: 'Runtime Error',       variant: 'danger'  },
-  PENDING:              { label: 'Pending',             variant: 'default' },
-  RUNNING:              { label: 'Running',             variant: 'info'    },
+  ACCEPTED:             { label: 'Accepted',      variant: 'accepted', icon: 'check_circle' },
+  WRONG_ANSWER:         { label: 'Wrong Answer',  variant: 'danger',   icon: 'cancel' },
+  COMPILATION_ERROR:    { label: 'Compile Error', variant: 'system',   icon: 'build' },
+  TIME_LIMIT_EXCEEDED:  { label: 'Time Limit',    variant: 'warning',  icon: 'schedule' },
+  MEMORY_LIMIT_EXCEEDED:{ label: 'Memory Limit',  variant: 'system',   icon: 'memory' },
+  RUNTIME_ERROR:        { label: 'Runtime Error', variant: 'danger',   icon: 'error' },
+  PENDING:              { label: 'Pending',       variant: 'default',  icon: 'hourglass_empty' },
+  RUNNING:              { label: 'Running',       variant: 'warning',  icon: 'progress_activity' },
+}
+
+const STATUS_COLOR = {
+  ACCEPTED:              'text-success-400',
+  WRONG_ANSWER:          'text-error',
+  RUNTIME_ERROR:         'text-error',
+  TIME_LIMIT_EXCEEDED:   'text-tertiary',
+  COMPILATION_ERROR:     'text-secondary',
+  MEMORY_LIMIT_EXCEEDED: 'text-secondary',
+  PENDING:               'text-tertiary',
+  RUNNING:               'text-tertiary',
 }
 
 const LANG_LABELS = { CPP: 'C++', JAVASCRIPT: 'JS', PYTHON: 'Python', JAVA: 'Java', C: 'C' }
@@ -49,13 +64,15 @@ export default function MySubmissionsPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">My Submissions</h1>
-          <p className="text-[#8890B0] text-sm mt-1">All your code submissions across problems and contests</p>
+          <h1 className="text-display-lg text-on-surface">My Submissions</h1>
+          <p className="mt-1 text-body-md text-on-surface-variant">
+            Every submission across problems and contests.
+          </p>
         </div>
         {!isLoading && total > 0 && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0E0F18] border border-[#20233A]">
-            <span className="text-emerald-400 font-bold text-lg">{accepted}</span>
-            <span className="text-[#454A68] text-sm">/ {total} accepted</span>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-low border border-outline-variant">
+            <span className="text-headline-sm tabular-nums text-success-400">{accepted}</span>
+            <span className="label">/ {total} accepted</span>
           </div>
         )}
       </div>
@@ -63,7 +80,7 @@ export default function MySubmissionsPage() {
       {/* Filters + Search */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-xs">
-          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#454A68]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -75,15 +92,15 @@ export default function MySubmissionsPage() {
           />
         </div>
 
-        <div className="flex items-center gap-1 p-1 rounded-xl border border-[#20233A] bg-[#0E0F18] overflow-x-auto">
+        <div className="flex items-center gap-1 p-1 rounded-xl border border-outline-variant bg-surface-container-low overflow-x-auto">
           {FILTERS.map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ${
                 filter === f
-                  ? 'bg-[#171828] text-white border border-[#20233A] shadow-sm'
-                  : 'text-[#8890B0] hover:text-white'
+                  ? 'bg-surface-container text-on-surface border border-outline-variant shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
               {f}
@@ -101,14 +118,14 @@ export default function MySubmissionsPage() {
         <div className="tbl-wrap">
           <div className="tbl-head grid grid-cols-[1fr_90px_120px_90px_80px_100px] px-5 py-3">
             {['Problem', 'Lang', 'Status', 'Tests', 'Time', 'Date'].map(h => (
-              <span key={h} className="text-[#454A68] text-xs font-semibold uppercase tracking-wider">{h}</span>
+              <span key={h} className="text-outline text-xs font-semibold uppercase tracking-wider">{h}</span>
             ))}
           </div>
 
           {filtered.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="text-4xl mb-3">📭</div>
-              <p className="text-[#8890B0] text-sm">
+              <div className="mb-3"><span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--outline)' }}>inbox</span></div>
+              <p className="text-on-surface-variant text-sm">
                 {search || filter !== 'All' ? 'No submissions match your filter.' : 'No submissions yet.'}
               </p>
               {(search || filter !== 'All') && (
@@ -133,22 +150,32 @@ export default function MySubmissionsPage() {
                 <div key={s.id} className="tbl-row grid grid-cols-[1fr_90px_120px_90px_80px_100px] px-5 py-3.5 items-center group">
                   <Link
                     to={`/questions/${s.question_id}`}
-                    className="text-white text-sm font-medium hover:text-emerald-400 transition-colors truncate pr-4 flex items-center gap-2"
+                    className="text-on-surface text-sm font-medium hover:text-emerald-400 transition-colors truncate pr-4 flex items-center gap-2"
                   >
                     {s.question_title || `Problem #${s.question_id}`}
                     {s.contest_id && (
-                      <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-400 border border-violet-500/20 font-semibold">
+                      <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-violet-400/10 text-violet-400 border border-violet-400/20 font-semibold">
                         Contest
                       </span>
                     )}
                   </Link>
-                  <span className="text-[#8890B0] text-xs font-mono">{LANG_LABELS[s.language] || s.language}</span>
-                  <div>
-                    <Badge variant={meta.variant} dot={false}>{meta.label}</Badge>
+                  <span>
+                    <span className="tag font-mono">{LANG_LABELS[s.language] || s.language}</span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`material-symbols-outlined flex-shrink-0 ${STATUS_COLOR[s.status] || 'text-on-surface-variant'}`}
+                      style={{ fontSize: 18 }}
+                    >
+                      {meta.icon || 'help'}
+                    </span>
+                    <span className={`text-label-md ${STATUS_COLOR[s.status] || 'text-on-surface-variant'}`}>
+                      {meta.label}
+                    </span>
                   </div>
-                  <span className="text-[#8890B0] text-xs font-mono">{tests}</span>
-                  <span className="text-[#454A68] text-xs font-mono">{ms}</span>
-                  <span className="text-[#454A68] text-xs">{date}</span>
+                  <span className="font-mono text-xs tabular-nums text-on-surface-variant">{tests}</span>
+                  <span className="font-mono text-xs tabular-nums text-on-surface-variant">{ms}</span>
+                  <span className="text-xs text-outline">{date}</span>
                 </div>
               )
             })

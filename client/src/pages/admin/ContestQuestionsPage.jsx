@@ -57,14 +57,14 @@ function PointsCell({ contestId, questionId, initialPoints }) {
         type="number" min={1} value={pts} autoFocus
         onChange={e => setPts(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
-        className="w-20 bg-[#06070C] border border-emerald-500/50 text-white rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-emerald-400"
+        className="w-20 bg-surface border border-emerald-400/50 text-on-surface rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-emerald-400"
       />
       <button onClick={save} disabled={isPending}
-        className="px-2 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50 transition-colors">
+        className="px-2 py-1 rounded-lg text-xs font-medium bg-emerald-400/20 text-emerald-400 hover:bg-emerald-400/30 disabled:opacity-50 transition-colors">
         {isPending ? '…' : '✓'}
       </button>
       <button onClick={() => setEditing(false)}
-        className="px-2 py-1 rounded-lg text-xs font-medium text-[#454A68] hover:text-white transition-colors">
+        className="px-2 py-1 rounded-lg text-xs font-medium text-outline hover:text-on-surface transition-colors">
         ✕
       </button>
     </div>
@@ -85,7 +85,11 @@ export default function ContestQuestionsPage() {
   const [pointsMap, setPointsMap] = useState({})     // questionId → points for "add" rows
 
   const contestQIds    = new Set((contestQuestions || []).map(q => String(q.id)))
+  /* Only the private contest pool is mappable. A practice question would be
+     rehearsable (and have readable samples) before the contest opened, so the
+     server rejects it too — this filter keeps the UI honest about that. */
   const availableQuestions = (allQuestions || []).filter(q =>
+    q.is_contest_only &&
     !contestQIds.has(String(q.id)) &&
     (q.title || '').toLowerCase().includes(search.toLowerCase())
   )
@@ -110,7 +114,7 @@ export default function ContestQuestionsPage() {
       <div className="flex items-center gap-4">
         <Link
           to="/admin/contests"
-          className="flex items-center gap-1.5 text-[#8890B0] hover:text-white transition-colors text-sm"
+          className="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface transition-colors text-sm"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -118,21 +122,21 @@ export default function ContestQuestionsPage() {
           Back
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-display-lg text-on-surface">
             {contest?.title || <span className="opacity-40">Loading…</span>}
           </h1>
-          <p className="text-[#8890B0] text-sm mt-0.5">Manage questions for this contest</p>
+          <p className="text-on-surface-variant text-sm mt-0.5">Manage questions for this contest</p>
         </div>
       </div>
 
       {/* ── Current questions ────────────────────────────────────────────── */}
       <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#15172A]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-container-high">
           <div>
-            <h2 className="text-white font-semibold text-sm">Contest Questions</h2>
-            <p className="text-[#454A68] text-xs mt-0.5">{(contestQuestions || []).length} question{(contestQuestions || []).length !== 1 ? 's' : ''} added</p>
+            <h2 className="text-on-surface font-semibold text-sm">Contest Questions</h2>
+            <p className="text-outline text-xs mt-0.5">{(contestQuestions || []).length} question{(contestQuestions || []).length !== 1 ? 's' : ''} added</p>
           </div>
-          <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center">
             <span className="text-emerald-400 text-xs font-bold">{(contestQuestions || []).length}</span>
           </div>
         </div>
@@ -141,21 +145,21 @@ export default function ContestQuestionsPage() {
           <div className="flex justify-center py-12"><Spinner /></div>
         ) : (contestQuestions || []).length === 0 ? (
           <div className="py-14 text-center">
-            <div className="text-4xl mb-3">📝</div>
-            <p className="text-[#8890B0] text-sm">No questions added yet.</p>
-            <p className="text-[#454A68] text-xs mt-1">Add questions from the list below.</p>
+            <div className="mb-3"><span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--outline)' }}>edit_note</span></div>
+            <p className="text-on-surface-variant text-sm">No questions added yet.</p>
+            <p className="text-outline text-xs mt-1">Add questions from the list below.</p>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-[32px_1fr_120px_140px_100px] px-5 py-2.5 bg-[#171828] border-b border-[#15172A]">
+            <div className="grid grid-cols-[32px_1fr_120px_140px_100px] px-5 py-2.5 bg-surface-container border-b border-surface-container-high">
               {['#', 'Title', 'Difficulty', 'Points', 'Action'].map(h => (
-                <span key={h} className="text-[#454A68] text-xs font-semibold uppercase tracking-wider last:text-right">{h}</span>
+                <span key={h} className="text-outline text-xs font-semibold uppercase tracking-wider last:text-right">{h}</span>
               ))}
             </div>
             {(contestQuestions || []).map((q, idx) => (
-              <div key={q.id} className="grid grid-cols-[32px_1fr_120px_140px_100px] px-5 py-3.5 items-center border-b border-[#0A0B14] last:border-0 hover:bg-[#171828] transition-colors">
-                <span className="text-[#454A68] text-xs font-mono">{String(idx + 1).padStart(2, '0')}</span>
-                <span className="text-white text-sm font-medium truncate pr-4">{q.title}</span>
+              <div key={q.id} className="grid grid-cols-[32px_1fr_120px_140px_100px] px-5 py-3.5 items-center border-b border-outline-variant last:border-0 hover:bg-surface-container transition-colors">
+                <span className="text-outline text-xs font-mono">{String(idx + 1).padStart(2, '0')}</span>
+                <span className="text-on-surface text-sm font-medium truncate pr-4">{q.title}</span>
                 <div><Badge variant={diffVariant(q.difficluty)} dot={false}>{diffLabel(q.difficluty)}</Badge></div>
                 <PointsCell contestId={id} questionId={String(q.id)} initialPoints={q.points} />
                 <div className="flex justify-end">
@@ -175,15 +179,17 @@ export default function ContestQuestionsPage() {
 
       {/* ── Add questions ────────────────────────────────────────────────── */}
       <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#15172A]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-container-high">
           <div>
-            <h2 className="text-white font-semibold text-sm">Add Questions</h2>
-            <p className="text-[#454A68] text-xs mt-0.5">{availableQuestions.length} available</p>
+            <h2 className="text-on-surface font-semibold text-sm">Add Questions</h2>
+            <p className="text-outline text-xs mt-0.5">
+              {availableQuestions.length} available from the contest-only pool
+            </p>
           </div>
 
           {/* Search */}
           <div className="relative">
-            <svg className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#454A68]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -191,29 +197,29 @@ export default function ContestQuestionsPage() {
               placeholder="Search questions…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-8 pr-4 py-1.5 bg-[#06070C] border border-[#20233A] text-white placeholder-[#454A68] rounded-lg text-xs focus:outline-none focus:border-emerald-500/50 w-52"
+              className="pl-8 pr-4 py-1.5 bg-surface border border-outline-variant text-on-surface placeholder-[#8c909f] rounded-lg text-xs focus:outline-none focus:border-emerald-400/50 w-52"
             />
           </div>
         </div>
 
         {availableQuestions.length === 0 ? (
           <div className="py-14 text-center">
-            <div className="text-4xl mb-3">{search ? '🔍' : '✅'}</div>
-            <p className="text-[#8890B0] text-sm">
+            <div className="mb-3"><span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--outline)' }}>{search ? 'search_off' : 'check_circle'}</span></div>
+            <p className="text-on-surface-variant text-sm">
               {search ? `No questions match "${search}"` : 'All questions have been added to this contest.'}
             </p>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-[32px_1fr_120px_120px_140px] px-5 py-2.5 bg-[#171828] border-b border-[#15172A]">
+            <div className="grid grid-cols-[32px_1fr_120px_120px_140px] px-5 py-2.5 bg-surface-container border-b border-surface-container-high">
               {['#', 'Title', 'Difficulty', 'Points', 'Action'].map(h => (
-                <span key={h} className="text-[#454A68] text-xs font-semibold uppercase tracking-wider last:text-right">{h}</span>
+                <span key={h} className="text-outline text-xs font-semibold uppercase tracking-wider last:text-right">{h}</span>
               ))}
             </div>
             {availableQuestions.map((q, idx) => (
-              <div key={q.id} className="grid grid-cols-[32px_1fr_120px_120px_140px] px-5 py-3.5 items-center border-b border-[#0A0B14] last:border-0 hover:bg-[#171828] transition-colors">
-                <span className="text-[#454A68] text-xs font-mono">{String(idx + 1).padStart(2, '0')}</span>
-                <span className="text-white text-sm font-medium truncate pr-4">{q.title}</span>
+              <div key={q.id} className="grid grid-cols-[32px_1fr_120px_120px_140px] px-5 py-3.5 items-center border-b border-outline-variant last:border-0 hover:bg-surface-container transition-colors">
+                <span className="text-outline text-xs font-mono">{String(idx + 1).padStart(2, '0')}</span>
+                <span className="text-on-surface text-sm font-medium truncate pr-4">{q.title}</span>
                 <div><Badge variant={diffVariant(q.difficluty)} dot={false}>{diffLabel(q.difficluty)}</Badge></div>
 
                 {/* Points input per question */}
@@ -221,14 +227,14 @@ export default function ContestQuestionsPage() {
                   type="number" min={1}
                   value={getPoints(q.id)}
                   onChange={e => setPoints(q.id, e.target.value)}
-                  className="w-20 bg-[#06070C] border border-[#20233A] text-white rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+                  className="w-20 bg-surface border border-outline-variant text-on-surface rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/20"
                 />
 
                 <div className="flex justify-end">
                   <button
                     onClick={() => handleAdd(q.id)}
                     disabled={isAdding}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 disabled:opacity-50 transition-all"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 hover:bg-emerald-400/20 hover:border-emerald-400/40 disabled:opacity-50 transition-all"
                   >
                     {isAdding ? (
                       <span className="w-3 h-3 border border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />

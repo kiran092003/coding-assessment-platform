@@ -42,7 +42,7 @@ export default function EditContestPage() {
       <div className="flex items-center gap-4">
         <Link
           to="/admin/contests"
-          className="flex items-center gap-1.5 text-[#8890B0] hover:text-white transition-colors text-sm"
+          className="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface transition-colors text-sm"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -50,8 +50,8 @@ export default function EditContestPage() {
           Back
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">Edit Contest</h1>
-          <p className="text-[#8890B0] text-sm mt-0.5">Update contest details</p>
+          <h1 className="text-display-lg text-on-surface">Edit Contest</h1>
+          <p className="text-on-surface-variant text-sm mt-0.5">Update contest details</p>
         </div>
       </div>
 
@@ -69,7 +69,7 @@ export default function EditContestPage() {
 
         {/* Title */}
         <div className="space-y-2">
-          <label className="block text-[#8890B0] text-xs font-semibold uppercase tracking-wider">
+          <label className="block text-on-surface-variant text-xs font-semibold uppercase tracking-wider">
             Contest Title <span className="text-red-400">*</span>
           </label>
           <input
@@ -83,7 +83,7 @@ export default function EditContestPage() {
 
         {/* Description */}
         <div className="space-y-2">
-          <label className="block text-[#8890B0] text-xs font-semibold uppercase tracking-wider">
+          <label className="block text-on-surface-variant text-xs font-semibold uppercase tracking-wider">
             Description
           </label>
           <textarea

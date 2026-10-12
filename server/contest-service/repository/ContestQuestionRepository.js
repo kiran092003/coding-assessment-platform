@@ -50,6 +50,39 @@ const GetQuestionsByContest = async (contestId) => {
     return rows;
 };
 
+/* Window + registration state for one caller, resolved in a single round trip. */
+const GetContestAccess = async (contestId, userId) => {
+
+    const query = `
+        SELECT c.id,
+               c.start_time,
+               c.end_time,
+               NOW() < c.start_time                     AS not_started,
+               NOW() BETWEEN c.start_time AND c.end_time AS is_live,
+               NOW() > c.end_time                       AS has_ended,
+               EXISTS (
+                   SELECT 1 FROM contest_registrations r
+                    WHERE r.contest_id = c.id AND r.user_id = ?
+               ) AS is_registered
+          FROM contests c
+         WHERE c.id = ?
+    `;
+
+    const [rows] = await pool.execute(query, [userId, contestId]);
+
+    return rows[0];
+};
+
+/* Used when mapping: a contest question must come from the private pool. */
+const GetQuestionPoolFlag = async (questionId) => {
+
+    const query = `SELECT id, is_contest_only FROM questions WHERE id = ?`;
+
+    const [rows] = await pool.execute(query, [questionId]);
+
+    return rows[0];
+};
+
 const RemoveQuestionFromContest = async (contestId, questionId) => {
 
     const query = `DELETE FROM contest_questions WHERE contest_id = ? AND question_id = ?`;
@@ -61,6 +94,8 @@ const RemoveQuestionFromContest = async (contestId, questionId) => {
 
 module.exports = {
     GetQuestionCountByContest,
+    GetContestAccess,
+    GetQuestionPoolFlag,
     GetMapping,
     AddQuestionToContest,
     UpdatePoints,

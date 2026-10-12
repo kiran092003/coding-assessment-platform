@@ -36,7 +36,10 @@ const GetSubmissionById = async (req, res) => {
     try {
 
         const { id } = req.params;
-        const cacheKey = `submission:${id}`;
+        /* Scoped to the caller. The cache was previously read before the
+           ownership check ran, so a shared key handed one user another
+           user's submission — source code included — on a cache hit. */
+        const cacheKey = `submission:${id}:caller:${req.user.id}`;
 
         const cachedData = await client.get(cacheKey);
 
@@ -44,7 +47,7 @@ const GetSubmissionById = async (req, res) => {
             return res.status(200).json(JSON.parse(cachedData));
         }
 
-        const submission = await submissionService.getSubmissionById(id, req.user.id);
+        const submission = await submissionService.getSubmissionById(id, req.user.id, req.user.role);
 
         // Only cache terminal statuses — PENDING/RUNNING change rapidly so don't cache them
         const TERMINAL = ['ACCEPTED', 'WRONG_ANSWER', 'COMPILATION_ERROR', 'TIME_LIMIT_EXCEEDED', 'MEMORY_LIMIT_EXCEEDED', 'RUNTIME_ERROR'];
@@ -115,9 +118,10 @@ const DeleteSubmission = async (req, res) => {
 
         const { id } = req.params;
 
-        await submissionService.deleteSubmission(id, req.user.id);
+        await submissionService.deleteSubmission(id, req.user.id, req.user.role);
 
-        await client.del(`submission:${id}`);
+        const staleKeys = await client.keys(`submission:${id}:caller:*`);
+        if (staleKeys.length) await client.del(staleKeys);
 
         res.status(200).json({ message: "Submission deleted" });
 

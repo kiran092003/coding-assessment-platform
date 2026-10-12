@@ -40,18 +40,28 @@ function SignupPage() {
     (error ? 'Registration failed. Please try again.' : null)
 
   return (
-    <AuthLayout>
+    <AuthLayout
+      footer={
+        <p className="text-body-md" style={{ color: 'var(--on-surface-variant)' }}>
+          Already have an account?{' '}
+          <Link to="/login" className="font-bold text-primary hover:underline">
+            Sign In
+          </Link>
+        </p>
+      }
+    >
       {/* Heading */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-white">Create an account</h2>
-        <p className="mt-1 text-sm text-gray-400">
-          Join thousands of developers on CodeArena
+      <div className="mb-stack-md">
+        <h2 className="text-headline-sm text-on-surface">Create Account</h2>
+        <p className="mt-1 text-body-md" style={{ color: 'var(--on-surface-variant)' }}>
+          Join the judge console and start solving
         </p>
       </div>
 
       {/* API error */}
       {apiError && (
-        <div className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        <div className="mb-5 flex items-center gap-2 rounded border border-error/30 bg-error/10 px-4 py-3 text-body-md text-error">
+          <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 18 }}>error</span>
           {apiError}
         </div>
       )}
@@ -146,7 +156,7 @@ function SignupPage() {
 
         {/* Role selector */}
         <div>
-          <p className="mb-2 text-sm font-medium text-gray-300">Account type</p>
+          <p className="label mb-2">Account type</p>
           <div className="grid grid-cols-2 gap-3">
             {ROLES.map(({ value, label, description }) => (
               <button
@@ -154,10 +164,10 @@ function SignupPage() {
                 type="button"
                 onClick={() => setValue('role', value, { shouldValidate: true })}
                 className={[
-                  'rounded-lg border p-3 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500',
+                  'rounded border p-3 text-left transition-colors focus:outline-none',
                   selectedRole === value
-                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
-                    : 'border-[#2a2a2a] bg-[#0f0f0f] text-gray-400 hover:border-[#3a3a3a]',
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:border-outline',
                 ].join(' ')}
               >
                 <span className="block text-sm font-medium">{label}</span>
@@ -181,27 +191,11 @@ function SignupPage() {
       </form>
 
       {/* Terms */}
-      <p className="mt-4 text-center text-xs text-gray-600">
+      <p className="mt-4 text-center text-[11px]" style={{ color: 'var(--outline)' }}>
         By creating an account you agree to our{' '}
-        <span className="text-gray-400 cursor-pointer hover:text-emerald-500 transition-colors">
-          Terms of Service
-        </span>{' '}
+        <span className="cursor-pointer text-on-surface-variant hover:text-primary">Terms of Service</span>{' '}
         and{' '}
-        <span className="text-gray-400 cursor-pointer hover:text-emerald-500 transition-colors">
-          Privacy Policy
-        </span>
-        .
-      </p>
-
-      {/* Login link */}
-      <p className="mt-5 text-center text-sm text-gray-500">
-        Already have an account?{' '}
-        <Link
-          to="/login"
-          className="font-medium text-emerald-500 hover:text-emerald-400 transition-colors"
-        >
-          Sign in
-        </Link>
+        <span className="cursor-pointer text-on-surface-variant hover:text-primary">Privacy Policy</span>.
       </p>
     </AuthLayout>
   )

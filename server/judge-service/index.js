@@ -37,7 +37,10 @@ app.get("/metrics", (_req, res) => {
     });
 });
 
-// ── Synchronous run endpoint (no DB record, first 2 sample test cases only) ──
+// ── Synchronous run endpoint (no DB record, sample test cases only) ─────────
+const MAX_SOURCE_BYTES = 64 * 1024;
+const RUN_SAMPLE_LIMIT = 2;
+
 app.post("/api/v1/judge/run", authenticationMiddleware, async (req, res) => {
     const { questionId, language, sourceCode } = req.body;
 
@@ -45,9 +48,23 @@ app.post("/api/v1/judge/run", authenticationMiddleware, async (req, res) => {
         return res.status(400).json({ error: "questionId, language, and sourceCode are required" });
     }
 
+    if (Buffer.byteLength(sourceCode, "utf8") > MAX_SOURCE_BYTES) {
+        return res.status(413).json({ error: "Source code exceeds the 64 KB limit" });
+    }
+
     try {
-        const allCases = await judgeRepository.getTestCasesByQuestionId(questionId);
-        const sampleCases = allCases.slice(0, 2);
+        /* Run is a free, unscored action, so it is gated on the same rules as
+           a submission: a private contest question only runs while its
+           contest is live and the caller is registered. Otherwise Run would
+           be an oracle for reading contest problems early. */
+        const allowed = await judgeRepository.isQuestionRunnableByUser(questionId, req.user.id, req.user.role);
+
+        if (!allowed) {
+            return res.status(403).json({ error: "This question is only available during its contest" });
+        }
+
+        const sampleCases = (await judgeRepository.getSampleTestCasesByQuestionId(questionId))
+            .slice(0, RUN_SAMPLE_LIMIT);
 
         if (sampleCases.length === 0) {
             return res.status(200).json({ status: "ACCEPTED", passed: 0, total: 0, execution_time_ms: 0 });

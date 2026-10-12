@@ -10,7 +10,7 @@ function Alert({ type, message, onDismiss }) {
     <div className={`flex items-start gap-2.5 p-3 rounded-xl text-sm border ${
       isError
         ? 'bg-red-500/10 border-red-500/20 text-red-400'
-        : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+        : 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400'
     }`}>
       <span className="flex-1">{message}</span>
       <button onClick={onDismiss} className="opacity-60 hover:opacity-100 transition-opacity mt-0.5 text-xs">✕</button>
@@ -67,7 +67,7 @@ export default function ProfilePage() {
   }
 
   const EyeIcon = ({ show, toggle }) => (
-    <button type="button" onClick={toggle} className="text-[#454A68] hover:text-[#8890B0] transition-colors">
+    <button type="button" onClick={toggle} className="text-outline hover:text-on-surface-variant transition-colors">
       {show ? (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
@@ -86,22 +86,22 @@ export default function ProfilePage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Profile & Settings</h1>
-        <p className="text-[#8890B0] text-sm mt-1">Manage your account information</p>
+        <h1 className="text-display-lg text-on-surface">Profile & Settings</h1>
+        <p className="text-on-surface-variant text-sm mt-1">Manage your account information</p>
       </div>
 
       {/* Avatar card */}
       <div className="card p-6 flex items-center gap-5">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white text-2xl font-bold flex-shrink-0 ring-4 ring-emerald-500/10">
+        <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center text-on-surface text-2xl font-bold flex-shrink-0 ring-4 ring-emerald-400/10">
           {(user?.name || 'U').slice(0, 2).toUpperCase()}
         </div>
         <div>
-          <p className="text-white font-semibold text-lg">{user?.name}</p>
-          <p className="text-[#8890B0] text-sm">{user?.email}</p>
-          <span className={`inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-md font-semibold tracking-widest uppercase ${
+          <p className="text-on-surface font-semibold text-lg">{user?.name}</p>
+          <p className="text-on-surface-variant text-sm">{user?.email}</p>
+          <span className={`inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded font-semibold tracking-widest uppercase ${
             user?.role === 'ADMIN'
-              ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20'
-              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              ? 'bg-violet-400/10 text-violet-400 border border-violet-400/20'
+              : 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/20'
           }`}>
             {ROLE_LABELS[user?.role] || user?.role}
           </span>
@@ -110,7 +110,7 @@ export default function ProfilePage() {
 
       {/* Edit name */}
       <div className="card p-6 space-y-5">
-        <h2 className="text-white font-semibold text-sm">Account Information</h2>
+        <h2 className="text-on-surface font-semibold text-sm">Account Information</h2>
 
         <Alert
           type={nameMsg?.type}
@@ -120,7 +120,7 @@ export default function ProfilePage() {
 
         <form onSubmit={handleNameSave} className="space-y-4">
           <div className="space-y-2">
-            <label className="block text-[#8890B0] text-xs font-semibold uppercase tracking-wider">Email</label>
+            <label className="block text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Email</label>
             <input
               type="email"
               value={user?.email || ''}
@@ -130,7 +130,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-[#8890B0] text-xs font-semibold uppercase tracking-wider">
+            <label className="block text-on-surface-variant text-xs font-semibold uppercase tracking-wider">
               Display Name
             </label>
             <input
@@ -159,8 +159,8 @@ export default function ProfilePage() {
       {/* Change password */}
       <div className="card p-6 space-y-5">
         <div>
-          <h2 className="text-white font-semibold text-sm">Change Password</h2>
-          <p className="text-[#454A68] text-xs mt-1">
+          <h2 className="text-on-surface font-semibold text-sm">Change Password</h2>
+          <p className="text-outline text-xs mt-1">
             Must be 8+ characters with uppercase, lowercase, 2 numbers, and a special character.
           </p>
         </div>
@@ -178,7 +178,7 @@ export default function ProfilePage() {
             { label: 'Confirm Password',  key: 'confirmPassword', show: showConfirm, toggle: () => setShowConfirm(v => !v) },
           ].map(({ label, key, show, toggle }) => (
             <div key={key} className="space-y-2">
-              <label className="block text-[#8890B0] text-xs font-semibold uppercase tracking-wider">{label}</label>
+              <label className="block text-on-surface-variant text-xs font-semibold uppercase tracking-wider">{label}</label>
               <div className="relative">
                 <input
                   type={show ? 'text' : 'password'}

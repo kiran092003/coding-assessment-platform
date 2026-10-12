@@ -1,13 +1,15 @@
 const pool = require("../db/connect");
 
-const CreateTestCase = async (questionId, inputData, expectedOutput, createdBy) => {
+const CreateTestCase = async (questionId, inputData, expectedOutput, createdBy, isHidden = 0) => {
 
     const query = `
-        INSERT INTO test_cases (question_id, input_data, expected_output, created_by)
-        VALUES(?,?,?,?)
+        INSERT INTO test_cases (question_id, input_data, expected_output, created_by, is_hidden)
+        VALUES(?,?,?,?,?)
     `;
 
-    const [result] = await pool.execute(query, [questionId, inputData, expectedOutput, createdBy]);
+    const [result] = await pool.execute(query, [
+        questionId, inputData, expectedOutput, createdBy, isHidden ? 1 : 0
+    ]);
 
     return result;
 };
@@ -23,7 +25,26 @@ const GetAllTestCases = async () => {
 
 const GetTestCasesByQuestionId = async (questionId) => {
 
-    const query = `SELECT * FROM test_cases WHERE question_id = ? ORDER BY created_at DESC`;
+    const query = `SELECT * FROM test_cases WHERE question_id = ? ORDER BY id ASC`;
+
+    const [rows] = await pool.execute(query, [questionId]);
+
+    return rows;
+};
+
+/**
+ * Sample cases only — the worked examples a solver is meant to see.
+ * Hidden cases decide the verdict and never leave the server, so they are
+ * excluded here rather than filtered in the caller.
+ */
+const GetSampleTestCasesByQuestionId = async (questionId) => {
+
+    const query = `
+        SELECT id, question_id, input_data, expected_output, is_hidden, created_at
+          FROM test_cases
+         WHERE question_id = ? AND is_hidden = 0
+         ORDER BY id ASC
+    `;
 
     const [rows] = await pool.execute(query, [questionId]);
 
@@ -39,16 +60,16 @@ const GetTestCaseById = async (id) => {
     return rows[0];
 };
 
-const UpdateTestCase = async (id, inputData, expectedOutput) => {
+const UpdateTestCase = async (id, inputData, expectedOutput, isHidden) => {
 
-    const query = `
-        UPDATE test_cases
-        SET input_data = ?, expected_output = ?
-        WHERE id = ?
-    `;
+    if (isHidden === undefined || isHidden === null) {
+        const query = `UPDATE test_cases SET input_data = ?, expected_output = ? WHERE id = ?`;
+        const [result] = await pool.execute(query, [inputData, expectedOutput, id]);
+        return result;
+    }
 
-    const [result] = await pool.execute(query, [inputData, expectedOutput, id]);
-
+    const query = `UPDATE test_cases SET input_data = ?, expected_output = ?, is_hidden = ? WHERE id = ?`;
+    const [result] = await pool.execute(query, [inputData, expectedOutput, isHidden ? 1 : 0, id]);
     return result;
 };
 
@@ -65,6 +86,7 @@ module.exports = {
     CreateTestCase,
     GetAllTestCases,
     GetTestCasesByQuestionId,
+    GetSampleTestCasesByQuestionId,
     GetTestCaseById,
     UpdateTestCase,
     DeleteTestCase

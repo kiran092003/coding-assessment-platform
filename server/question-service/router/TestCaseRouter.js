@@ -12,9 +12,9 @@ const {
 const { authenticationMiddleware, authorizeRole } = require("../middleware/auth");
 
 routers.route("/create").post(authenticationMiddleware, authorizeRole("ADMIN"), CreateTestCase);
-routers.route("/getAll").get(authenticationMiddleware, GetAllTestCases);
+routers.route("/getAll").get(authenticationMiddleware, authorizeRole("ADMIN"), GetAllTestCases);
 routers.route("/getByQuestion/:questionId").get(authenticationMiddleware, GetTestCasesByQuestionId);
-routers.route("/getById/:id").get(authenticationMiddleware, GetTestCaseById);
+routers.route("/getById/:id").get(authenticationMiddleware, authorizeRole("ADMIN"), GetTestCaseById);
 routers.route("/update/:id").patch(authenticationMiddleware, authorizeRole("ADMIN"), UpdateTestCase);
 routers.route("/delete/:id").delete(authenticationMiddleware, authorizeRole("ADMIN"), DeleteTestCase);
 

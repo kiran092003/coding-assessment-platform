@@ -35,17 +35,27 @@ function LoginPage() {
     (error ? 'Invalid email or password. Please try again.' : null)
 
   return (
-    <AuthLayout>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-white">Welcome back</h2>
-        <p className="mt-1 text-sm" style={{ color: '#8890B0' }}>
-          Sign in to continue to CodeArena
+    <AuthLayout
+      footer={
+        <p className="text-body-md" style={{ color: 'var(--on-surface-variant)' }}>
+          Don&apos;t have an account?{' '}
+          <Link to="/register" className="font-bold text-primary hover:underline">
+            Create Account
+          </Link>
+        </p>
+      }
+    >
+      <div className="mb-stack-md">
+        <h2 className="text-headline-sm text-on-surface">Welcome Back</h2>
+        <p className="mt-1 text-body-md" style={{ color: 'var(--on-surface-variant)' }}>
+          Sign in to continue to the judge console
         </p>
       </div>
 
       {successMessage && (
-        <div className="mb-5 rounded-xl border border-emerald-500/25 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-400 flex items-center gap-2">
-          <span>✓</span>{successMessage}
+        <div className="mb-5 flex items-center gap-2 rounded border border-success-400/30 bg-success-400/10 px-4 py-3 text-body-md text-success-400">
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
+          {successMessage}
         </div>
       )}
 
@@ -122,7 +132,7 @@ function LoginPage() {
         <div className="flex justify-end">
           <button
             type="button"
-            className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors"
+            className="label text-primary transition-colors hover:underline"
           >
             Forgot password?
           </button>
@@ -139,12 +149,6 @@ function LoginPage() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm" style={{ color: '#454A68' }}>
-        Don&apos;t have an account?{' '}
-        <Link to="/register" className="font-medium text-emerald-500 hover:text-emerald-400 transition-colors">
-          Create one
-        </Link>
-      </p>
     </AuthLayout>
   )
 }

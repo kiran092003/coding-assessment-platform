@@ -1,5 +1,7 @@
 import api from '@/lib/axios'
 
+/* Non-admin callers receive sample cases only — the server withholds hidden
+   cases and their expected outputs. */
 export const getTestCasesByQuestion = (questionId) => api.get(`/api/v1/testcases/getByQuestion/${questionId}`).then(r => r.data)
 export const createTestCase = (data) => api.post('/api/v1/testcases/create', data).then(r => r.data)
 export const updateTestCase = (id, data) => api.patch(`/api/v1/testcases/update/${id}`, data).then(r => r.data)

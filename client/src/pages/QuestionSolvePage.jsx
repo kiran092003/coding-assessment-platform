@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
+import { MONACO_THEME, registerMonacoTheme, monacoOptions } from '@/lib/monacoTheme'
 import { format } from 'date-fns'
 import { useQuestion } from '@/features/questions/hooks/useQuestions'
 import { useTestCases } from '@/features/testcases/hooks/useTestCases'
@@ -181,23 +182,25 @@ function getStatusVariant(s) {
 }
 
 function getStatusColor(s) {
-  if (s === 'ACCEPTED') return 'text-emerald-400'
-  if (s === 'WRONG_ANSWER' || s === 'COMPILATION_ERROR') return 'text-red-400'
-  if (s === 'PENDING' || s === 'RUNNING') return 'text-yellow-400'
-  return 'text-gray-400'
+  if (s === 'ACCEPTED') return 'text-success-400'
+  if (s === 'WRONG_ANSWER' || s === 'RUNTIME_ERROR') return 'text-error'
+  if (s === 'TIME_LIMIT_EXCEEDED') return 'text-tertiary'
+  if (s === 'COMPILATION_ERROR' || s === 'MEMORY_LIMIT_EXCEEDED') return 'text-secondary'
+  if (s === 'PENDING' || s === 'RUNNING') return 'text-tertiary'
+  return 'text-on-surface-variant'
 }
 
 function ResultPanel({ result, isPolling, isRunning, mode, onClose }) {
   if (!result && !isPolling && !isRunning) return null
 
   return (
-    <div className="border-t border-[#20233A] bg-[#0E0F18]">
+    <div className="border-t border-outline-variant bg-surface-container-low">
       {/* Panel Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[#20233A]">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant">
         <span className="text-sm font-medium text-gray-300">
           {mode === 'run' ? 'Test Result (sample cases)' : 'Submission Result'}
         </span>
-        <button onClick={onClose} className="text-gray-500 hover:text-white text-lg leading-none">×</button>
+        <button onClick={onClose} className="text-gray-500 hover:text-on-surface text-lg leading-none">×</button>
       </div>
 
       <div className="px-4 py-4 min-h-[100px]">
@@ -239,7 +242,7 @@ function ResultPanel({ result, isPolling, isRunning, mode, onClose }) {
               {result.execution_time_ms > 0 && (
                 <div className="flex items-center gap-2">
                   <span className="text-gray-500">Runtime</span>
-                  <span className="text-white font-medium">{result.execution_time_ms} ms</span>
+                  <span className="text-on-surface font-medium">{result.execution_time_ms} ms</span>
                 </div>
               )}
             </div>
@@ -322,12 +325,19 @@ export default function QuestionSolvePage() {
     // Full height layout, bypass AppLayout padding
     <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-[#20233A] bg-[#0E0F18] flex-shrink-0">
-        <Link to="/questions" className="text-gray-400 hover:text-white transition-colors text-sm">
-          ← Problems
+      <div
+        className="flex h-12 flex-shrink-0 items-center gap-3 border-b px-4"
+        style={{ background: 'var(--surface-low)', borderColor: 'var(--outline-variant)' }}
+      >
+        <Link
+          to="/questions"
+          className="flex items-center gap-1 text-body-md text-on-surface-variant transition-colors hover:text-primary"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>
+          Problems
         </Link>
-        <span className="text-gray-600">|</span>
-        <span className="text-white font-medium text-sm">{question.title}</span>
+        <span style={{ color: 'var(--outline-variant)' }}>/</span>
+        <span className="text-body-md text-on-surface">{question.title}</span>
         <Badge variant={getDiffVariant(question.difficluty)} className="ml-1">
           {question.difficluty || 'N/A'}
         </Badge>
@@ -337,17 +347,20 @@ export default function QuestionSolvePage() {
       <div className="flex flex-1 min-h-0">
 
         {/* ── LEFT PANEL ── */}
-        <div className="w-[42%] flex flex-col border-r border-[#20233A] min-h-0">
+        <div className="w-[42%] flex flex-col border-r border-outline-variant min-h-0">
           {/* Tabs */}
-          <div className="flex border-b border-[#20233A] flex-shrink-0 bg-[#0E0F18]">
+          <div
+            className="flex flex-shrink-0 border-b"
+            style={{ background: 'var(--surface-low)', borderColor: 'var(--outline-variant)' }}
+          >
             {['description', 'submissions'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-5 py-3 text-sm font-medium capitalize transition-colors border-b-2 ${
+                className={`border-b-2 px-5 py-3 text-label-md capitalize transition-colors ${
                   activeTab === tab
-                    ? 'text-white border-emerald-500'
-                    : 'text-gray-400 border-transparent hover:text-white'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-on-surface-variant hover:text-primary'
                 }`}
               >
                 {tab}
@@ -361,7 +374,7 @@ export default function QuestionSolvePage() {
               <>
                 {/* Title + difficulty */}
                 <div>
-                  <h1 className="text-xl font-bold text-white mb-2">{question.title}</h1>
+                  <h1 className="text-headline-sm text-on-surface mb-2">{question.title}</h1>
                   <Badge variant={getDiffVariant(question.difficluty)}>
                     {question.difficluty === 'Low' ? 'Easy' : question.difficluty === 'High' ? 'Hard' : 'Medium'}
                   </Badge>
@@ -377,8 +390,8 @@ export default function QuestionSolvePage() {
                   <div className="space-y-4">
                     {sampleCases.map((tc, idx) => (
                       <div key={tc.id}>
-                        <p className="text-white font-semibold text-sm mb-2">Example {idx + 1}:</p>
-                        <div className="bg-[#06070C] rounded-lg p-4 space-y-2 border border-[#20233A]">
+                        <p className="text-on-surface font-semibold text-sm mb-2">Example {idx + 1}:</p>
+                        <div className="bg-surface rounded-lg p-4 space-y-2 border border-outline-variant">
                           <div className="font-mono text-sm">
                             <span className="text-gray-400 font-sans font-medium">Input: </span>
                             <span className="text-gray-100">{tc.input_data}</span>
@@ -394,20 +407,20 @@ export default function QuestionSolvePage() {
                 )}
 
                 {/* Constraints note */}
-                <div className="text-xs text-gray-500 border-t border-[#20233A] pt-4">
+                <div className="text-xs text-gray-500 border-t border-outline-variant pt-4">
                   All submissions are judged against hidden test cases.
                 </div>
               </>
             ) : (
               /* Submissions tab */
               <div>
-                <h2 className="text-white font-semibold mb-4">My Submissions</h2>
+                <h2 className="text-on-surface font-semibold mb-4">My Submissions</h2>
                 {!mySubmissions || mySubmissions.length === 0 ? (
                   <p className="text-gray-500 text-sm">No submissions yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {mySubmissions.map(sub => (
-                      <div key={sub.id} className="bg-[#06070C] border border-[#20233A] rounded-lg px-4 py-3 flex items-center justify-between">
+                      <div key={sub.id} className="bg-surface border border-outline-variant rounded-lg px-4 py-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className={`text-sm font-medium ${getStatusColor(sub.status)}`}>
                             {sub.status}
@@ -435,41 +448,34 @@ export default function QuestionSolvePage() {
         {/* ── RIGHT PANEL ── */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0">
           {/* Editor top bar */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-[#20233A] bg-[#0E0F18] flex-shrink-0">
+          <div
+            className="flex h-12 flex-shrink-0 items-center justify-between border-b px-4"
+            style={{ background: 'var(--surface-low)', borderColor: 'var(--outline-variant)' }}
+          >
             {/* Language selector */}
-            <select
-              value={language}
-              onChange={e => handleLanguageChange(e.target.value)}
-              className="bg-[#171828] border border-[#2E3150] text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-            >
-              {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
+            <div className="flex items-center gap-2" style={{ color: 'var(--on-surface-variant)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>code</span>
+              <select
+                value={language}
+                onChange={e => handleLanguageChange(e.target.value)}
+                className="input-field h-8 w-auto cursor-pointer py-0 pl-2 pr-8 text-label-md"
+              >
+                {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
 
             {/* Action buttons */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleRun}
-                disabled={isJudging}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium bg-[#171828] hover:bg-[#3a3a3a] text-white disabled:opacity-50 border border-[#2E3150] transition-colors"
-              >
-                {isJudging && mode === 'run' ? <Spinner size="sm" /> : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                )}
+              <button onClick={handleRun} disabled={isJudging} className="btn-secondary h-8">
+                {isJudging && mode === 'run'
+                  ? <Spinner size="sm" />
+                  : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>play_arrow</span>}
                 Run
               </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isJudging}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
-              >
-                {isJudging && mode === 'submit' ? <Spinner size="sm" /> : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                )}
+              <button onClick={handleSubmit} disabled={isJudging} className="btn-primary h-8">
+                {isJudging && mode === 'submit'
+                  ? <Spinner size="sm" />
+                  : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>}
                 Submit
               </button>
             </div>
@@ -482,29 +488,15 @@ export default function QuestionSolvePage() {
               language={MONACO_LANG[language]}
               value={code}
               onChange={val => setCode(val || '')}
-              theme="vs-dark"
-              options={{
-                fontSize: 14,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                padding: { top: 16, bottom: 16 },
-                lineNumbers: 'on',
-                renderLineHighlight: 'line',
-                tabSize: 4,
-                automaticLayout: true,
-                fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                fontLigatures: true,
-                cursorBlinking: 'smooth',
-                smoothScrolling: true,
-                contextmenu: true,
-                wordWrap: 'off',
-              }}
+              theme={MONACO_THEME}
+              beforeMount={registerMonacoTheme}
+              options={monacoOptions}
             />
           </div>
 
           {/* Result panel — slides in at bottom */}
           {showResult && (
-            <div className="flex-shrink-0 max-h-[200px] overflow-y-auto border-t border-[#20233A]">
+            <div className="flex-shrink-0 max-h-[200px] overflow-y-auto border-t border-outline-variant">
               <ResultPanel
                 result={result}
                 isPolling={isPolling}

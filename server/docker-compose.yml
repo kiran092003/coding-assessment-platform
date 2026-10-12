@@ -6,14 +6,14 @@ services:
     image: mysql:8
     container_name: mysql
     environment:
-      MYSQL_ROOT_PASSWORD: Shamlatha@123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in server/.env}
       MYSQL_DATABASE: coding_assessment_platform
     ports:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pShamlatha@123"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -91,11 +91,11 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
-      DB_PASSWORD: Shamlatha@123
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in server/.env}
       DB_NAME: coding_assessment_platform
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: access_secret_key
-      JWT_REFRESH_SECRET: refresh_secret_key
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in server/.env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in server/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -115,10 +115,10 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
-      DB_PASSWORD: Shamlatha@123
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in server/.env}
       DB_NAME: coding_assessment_platform
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: access_secret_key
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in server/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -138,10 +138,10 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
-      DB_PASSWORD: Shamlatha@123
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in server/.env}
       DB_NAME: coding_assessment_platform
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: access_secret_key
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in server/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -161,11 +161,11 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
-      DB_PASSWORD: Shamlatha@123
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in server/.env}
       DB_NAME: coding_assessment_platform
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_SECRET: access_secret_key
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in server/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -187,11 +187,11 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
-      DB_PASSWORD: Shamlatha@123
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in server/.env}
       DB_NAME: coding_assessment_platform
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_SECRET: access_secret_key
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in server/.env}
     volumes:
       # DooD: share host Docker socket so judge can spawn execution containers
       - /var/run/docker.sock:/var/run/docker.sock
@@ -218,11 +218,11 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
-      DB_PASSWORD: Shamlatha@123
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in server/.env}
       DB_NAME: coding_assessment_platform
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_SECRET: access_secret_key
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in server/.env}
     depends_on:
       mysql:
         condition: service_healthy

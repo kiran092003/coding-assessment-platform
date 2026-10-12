@@ -1,10 +1,23 @@
 const testCaseService = require("../services/TestCaseService");
 const { client } = require("../config/redis");
 
+/* Cache keys are scoped by audience. An admin response contains hidden cases
+   and expected outputs; serving that from a shared key would hand them to the
+   next regular user who asked. */
+const scopeOf = (user) => (user?.role === "ADMIN" ? "admin" : `user:${user.id}`);
+
+const invalidateQuestion = async (questionId) => {
+    const keys = await client.keys(`testcases:q:${questionId}:*`);
+    await Promise.all([
+        client.del("testcases:all"),
+        ...(keys.length ? [client.del(keys)] : []),
+    ]);
+};
+
 const CreateTestCase = async (req, res) => {
     try {
 
-        const { questionId, inputData, expectedOutput } = req.body;
+        const { questionId, inputData, expectedOutput, isHidden } = req.body;
 
         if (!questionId || !inputData || !expectedOutput) {
             return res.status(400).json({ error: "Required fields missing" });
@@ -14,13 +27,11 @@ const CreateTestCase = async (req, res) => {
             questionId,
             inputData.trim(),
             expectedOutput.trim(),
-            req.user.id
+            req.user.id,
+            isHidden === true || isHidden === 1 || isHidden === "true"
         );
 
-        await Promise.all([
-            client.del("testcases:all"),
-            client.del(`testcases:question:${questionId}`),
-        ]);
+        await invalidateQuestion(questionId);
 
         res.status(201).json({ message: "Test case created", testCaseId: testCase.insertId });
 
@@ -29,15 +40,14 @@ const CreateTestCase = async (req, res) => {
     }
 };
 
+/* ADMIN only (enforced on the route). */
 const GetAllTestCases = async (req, res) => {
     try {
 
         const cacheKey = "testcases:all";
 
         const cachedData = await client.get(cacheKey);
-
         if (cachedData) {
-            console.log("Serving all test cases from Redis");
             return res.status(200).json(JSON.parse(cachedData));
         }
 
@@ -56,18 +66,16 @@ const GetTestCasesByQuestionId = async (req, res) => {
     try {
 
         const { questionId } = req.params;
-        const cacheKey = `testcases:question:${questionId}`;
+        const cacheKey = `testcases:q:${questionId}:${scopeOf(req.user)}`;
 
         const cachedData = await client.get(cacheKey);
-
         if (cachedData) {
-            console.log(`Serving test cases for question ${questionId} from Redis`);
             return res.status(200).json(JSON.parse(cachedData));
         }
 
-        const testCases = await testCaseService.getTestCasesByQuestionId(questionId);
+        const testCases = await testCaseService.getTestCasesByQuestionId(questionId, req.user);
 
-        await client.set(cacheKey, JSON.stringify(testCases), { EX: 300 });
+        await client.set(cacheKey, JSON.stringify(testCases), { EX: 60 });
 
         res.status(200).json(testCases);
 
@@ -76,22 +84,13 @@ const GetTestCasesByQuestionId = async (req, res) => {
     }
 };
 
+/* ADMIN only (enforced on the route). */
 const GetTestCaseById = async (req, res) => {
     try {
 
         const { id } = req.params;
-        const cacheKey = `testcase:${id}`;
-
-        const cachedData = await client.get(cacheKey);
-
-        if (cachedData) {
-            console.log(`Serving test case ${id} from Redis`);
-            return res.status(200).json(JSON.parse(cachedData));
-        }
 
         const testCase = await testCaseService.getTestCaseById(id);
-
-        await client.set(cacheKey, JSON.stringify(testCase), { EX: 300 });
 
         res.status(200).json(testCase);
 
@@ -104,14 +103,18 @@ const UpdateTestCase = async (req, res) => {
     try {
 
         const { id } = req.params;
-        const { inputData, expectedOutput } = req.body;
+        const { inputData, expectedOutput, isHidden } = req.body;
 
-        await testCaseService.updateTestCase(id, inputData, expectedOutput, req.user.id);
+        const existing = await testCaseService.getTestCaseById(id);
 
-        await Promise.all([
-            client.del(`testcase:${id}`),
-            client.del("testcases:all"),
-        ]);
+        await testCaseService.updateTestCase(
+            id,
+            inputData,
+            expectedOutput,
+            isHidden === undefined ? undefined : (isHidden === true || isHidden === 1 || isHidden === "true")
+        );
+
+        await invalidateQuestion(existing.question_id);
 
         res.status(200).json({ message: "Test case updated" });
 
@@ -125,12 +128,11 @@ const DeleteTestCase = async (req, res) => {
 
         const { id } = req.params;
 
-        await testCaseService.deleteTestCase(id, req.user.id);
+        const existing = await testCaseService.getTestCaseById(id);
 
-        await Promise.all([
-            client.del(`testcase:${id}`),
-            client.del("testcases:all"),
-        ]);
+        await testCaseService.deleteTestCase(id);
+
+        await invalidateQuestion(existing.question_id);
 
         res.status(200).json({ message: "Test case deleted" });
 

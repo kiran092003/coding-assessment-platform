@@ -31,9 +31,8 @@ const updateContest = async (id, title, description, startTime, endTime, userId)
         throw new AppError("Contest not found", 404);
     }
 
-    if (contest.created_by !== userId) {
-        throw new AppError("You are not authorized to update this contest", 403);
-    }
+    /* Route is ADMIN-only. The previous created_by equality check meant a
+       second admin could not maintain a colleague's contest. */
 
     const resolvedStart = startTime || contest.start_time;
     const resolvedEnd = endTime || contest.end_time;
@@ -52,17 +51,17 @@ const deleteContest = async (id, userId) => {
         throw new AppError("Contest not found", 404);
     }
 
-    if (contest.created_by !== userId) {
-        throw new AppError("You are not authorized to delete this contest", 403);
-    }
-
     return await contestRepository.DeleteContest(id);
 };
 
 const registerForContest = async (contestId, userId) => {
     const contest = await contestRepository.GetContestById(contestId);
     if (!contest) throw new AppError("Contest not found", 404);
-    if (new Date() > new Date(contest.end_time)) throw new AppError("Contest has ended, registration is closed", 400);
+
+    if (new Date() > new Date(contest.end_time)) {
+        throw new AppError("Contest has ended, registration is closed", 400);
+    }
+
     await contestRepository.RegisterForContest(contestId, userId);
     return { message: "Registered successfully" };
 };

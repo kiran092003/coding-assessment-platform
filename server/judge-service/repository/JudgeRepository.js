@@ -21,6 +21,63 @@ const getTestCasesByQuestionId = async (questionId) => {
     return rows;
 };
 
+/**
+ * Sample cases only, for the synchronous Run button.
+ *
+ * Submit scores against every case (hidden included); Run must never execute
+ * a hidden case, because its pass/fail count would reveal information about
+ * tests the solver is not meant to see.
+ */
+const getSampleTestCasesByQuestionId = async (questionId) => {
+    const cacheKey = `testcases:sample:${questionId}`;
+
+    const cachedData = await client.get(cacheKey);
+
+    if (cachedData) {
+        return JSON.parse(cachedData);
+    }
+
+    const [rows] = await pool.execute(
+        `SELECT * FROM test_cases WHERE question_id = ? AND is_hidden = 0 ORDER BY id ASC`,
+        [questionId]
+    );
+
+    await client.set(cacheKey, JSON.stringify(rows), { EX: 3600 });
+
+    return rows;
+};
+
+/**
+ * Mirrors the submission eligibility rule for the Run button: practice
+ * questions are always runnable, private contest questions only while the
+ * contest is live and the caller is registered.
+ */
+const isQuestionRunnableByUser = async (questionId, userId, role) => {
+
+    if (role === "ADMIN") return true;
+
+    const [qRows] = await pool.execute(
+        `SELECT is_contest_only FROM questions WHERE id = ?`,
+        [questionId]
+    );
+
+    if (!qRows[0]) return false;
+    if (!qRows[0].is_contest_only) return true;
+
+    const [rows] = await pool.execute(
+        `SELECT 1
+           FROM contest_questions cq
+           JOIN contests c              ON c.id = cq.contest_id
+           JOIN contest_registrations r ON r.contest_id = c.id AND r.user_id = ?
+          WHERE cq.question_id = ?
+            AND NOW() BETWEEN c.start_time AND c.end_time
+          LIMIT 1`,
+        [userId, questionId]
+    );
+
+    return rows.length > 0;
+};
+
 const updateSubmissionStatus = async (
     submissionId,
     status,
@@ -37,8 +94,10 @@ const updateSubmissionStatus = async (
 
     const verdict = { submissionId, status, passedTestcases, totalTestcases, executionTimeMs };
 
-    // Invalidate submission cache so the next REST poll returns fresh data
-    await client.del(`submission:${submissionId}`);
+    // Invalidate submission cache so the next REST poll returns fresh data.
+    // Keys are caller-scoped (submission:<id>:caller:<userId>), so clear the set.
+    const staleKeys = await client.keys(`submission:${submissionId}:caller:*`);
+    if (staleKeys.length) await client.del(staleKeys);
 
     // Push status update to submission-service via Redis Pub/Sub
     await client.publish("submission:verdict", JSON.stringify(verdict));
@@ -46,4 +105,9 @@ const updateSubmissionStatus = async (
     console.log(`  [Redis] Published verdict for submission ${submissionId}: ${status}`);
 };
 
-module.exports = { getTestCasesByQuestionId, updateSubmissionStatus };
+module.exports = {
+    getTestCasesByQuestionId,
+    getSampleTestCasesByQuestionId,
+    isQuestionRunnableByUser,
+    updateSubmissionStatus,
+};

@@ -5,7 +5,7 @@ export default function DateTimePicker({ label, value, onChange, placeholder = '
     <CustomProvider theme="dark">
       <div>
         {label && (
-          <label className="block text-[#8890B0] text-xs font-semibold uppercase tracking-wider mb-2">
+          <label className="block text-on-surface-variant text-xs font-semibold uppercase tracking-wider mb-2">
             {label}
           </label>
         )}
