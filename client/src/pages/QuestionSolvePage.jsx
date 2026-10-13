@@ -9,6 +9,7 @@ import { useSubmitCode, useRunCode, useMySubmissions } from '@/features/submissi
 import Badge from '@/components/ui/Badge'
 import Markdown from '@/components/ui/Markdown'
 import Spinner from '@/components/ui/Spinner'
+import ResultPanel from '@/components/ui/ResultPanel'
 
 const LANGUAGES = ['CPP', 'JAVA', 'PYTHON', 'JAVASCRIPT', 'C']
 const MONACO_LANG = { C: 'c', CPP: 'cpp', JAVA: 'java', PYTHON: 'python', JAVASCRIPT: 'javascript' }
@@ -122,48 +123,69 @@ const getDefaultCode = (language, title = 'solve', returnType = 'int', params = 
     return ` * @param {${toJsRt(clean.join(' '))}} ${name}`
   }).join('\n')
 
+  // Every seeded problem is stdin -> stdout and the statement spells out the
+  // exact line format, so the starter reads stdin directly. A `class Solution`
+  // skeleton cannot express a multi-line input such as a grid or an edge list.
+  // A Solution class still works for simple signatures — the judge wraps it.
   const templates = {
     CPP:
 `#include <bits/stdc++.h>
 using namespace std;
 
-class Solution {
-public:
-    ${returnType} ${fn}(${params}) {
+// Read the input exactly as described in the problem statement.
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
 
-    }
-};
+    // e.g.  int n; cin >> n;
+    //       vector<int> a(n); for (int& x : a) cin >> x;
+
+    return 0;
+}
 `,
     JAVA:
-`class Solution {
-    public ${javaRt} ${fn}(${javaP}) {
+`import java.util.*;
+import java.io.*;
+
+// Read the input exactly as described in the problem statement.
+public class Main {
+    public static void main(String[] args) throws IOException {
+        StreamTokenizer in = new StreamTokenizer(new BufferedInputStream(System.in));
+
+        // e.g.  in.nextToken(); int n = (int) in.nval;
 
     }
 }
 `,
     PYTHON:
-`class Solution:
-    def ${fn}(self${pyP}) -> ${pyRt}:
-        pass
+`import sys
+
+# Read the input exactly as described in the problem statement.
+def main():
+    data = sys.stdin.read().split()
+    # e.g.  n = int(data[0]); a = list(map(int, data[1:1 + n]))
+
+main()
 `,
     JAVASCRIPT:
-`/**
-${jsJsdoc ? jsJsdoc + '\n' : ''} * @return {${jsRt}}
- */
-var ${fn} = function(${jsP}) {
+`// Read the input exactly as described in the problem statement.
+const data = require('fs').readFileSync(0, 'utf8').split(/\s+/).filter(Boolean);
 
-};
+// e.g.  const n = Number(data[0]);
+//       const a = data.slice(1, 1 + n).map(Number);
 `,
     C:
 `#include <stdio.h>
 
-// C: write a full program that reads from stdin and prints to stdout
-int main() {
+/* Read the input exactly as described in the problem statement. */
+int main(void) {
+    /* e.g.  int n; scanf("%d", &n); */
 
     return 0;
 }
 `,
   }
+
   return templates[language] || templates.CPP
 }
 
@@ -191,68 +213,6 @@ function getStatusColor(s) {
   return 'text-on-surface-variant'
 }
 
-function ResultPanel({ result, isPolling, isRunning, mode, onClose }) {
-  if (!result && !isPolling && !isRunning) return null
-
-  return (
-    <div className="border-t border-outline-variant bg-surface-container-low">
-      {/* Panel Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant">
-        <span className="text-sm font-medium text-gray-300">
-          {mode === 'run' ? 'Test Result (sample cases)' : 'Submission Result'}
-        </span>
-        <button onClick={onClose} className="text-gray-500 hover:text-on-surface text-lg leading-none">×</button>
-      </div>
-
-      <div className="px-4 py-4 min-h-[100px]">
-        {(isPolling || isRunning) && !result ? (
-          <div className="flex items-center gap-3 text-yellow-400">
-            <Spinner size="sm" />
-            <span className="text-sm">
-              {mode === 'run' ? 'Running against sample cases...' : 'Submitting solution...'}
-            </span>
-          </div>
-        ) : result ? (
-          <div className="space-y-3">
-            {/* Verdict */}
-            <div className="flex items-center gap-4">
-              <span className={`text-xl font-bold ${getStatusColor(result.status)}`}>
-                {result.status === 'ACCEPTED' ? '✓ Accepted' :
-                 result.status === 'WRONG_ANSWER' ? '✗ Wrong Answer' :
-                 result.status === 'COMPILATION_ERROR' ? '✗ Compilation Error' :
-                 result.status === 'TIME_LIMIT_EXCEEDED' ? '⏱ Time Limit Exceeded' :
-                 result.status === 'RUNTIME_ERROR' ? '✗ Runtime Error' :
-                 result.status}
-              </span>
-            </div>
-
-            {/* Stats row — run returns {passed, total}, submit returns {passed_testcases, total_testcases} */}
-            <div className="flex items-center gap-6 text-sm">
-              {(() => {
-                const p = result.passed ?? result.passed_testcases
-                const t = result.total  ?? result.total_testcases
-                if (t > 0) return (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500">Tests passed</span>
-                    <span className={p === t ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium'}>
-                      {p} / {t}
-                    </span>
-                  </div>
-                )
-              })()}
-              {result.execution_time_ms > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">Runtime</span>
-                  <span className="text-on-surface font-medium">{result.execution_time_ms} ms</span>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  )
-}
 
 export default function QuestionSolvePage() {
   const { id } = useParams()

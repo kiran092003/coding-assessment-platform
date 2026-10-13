@@ -10,6 +10,7 @@ import { useSubmitCode, useRunCode, useMySubmissions } from '@/features/submissi
 import Badge from '@/components/ui/Badge'
 import Markdown from '@/components/ui/Markdown'
 import Spinner from '@/components/ui/Spinner'
+import ResultPanel from '@/components/ui/ResultPanel'
 
 const LANGUAGES = ['CPP', 'JAVA', 'PYTHON', 'JAVASCRIPT', 'C']
 const MONACO_LANG = { C: 'c', CPP: 'cpp', JAVA: 'java', PYTHON: 'python', JAVASCRIPT: 'javascript' }
@@ -170,63 +171,6 @@ function getStatusColor(s) {
   return 'text-on-surface-variant'
 }
 
-function ResultPanel({ result, isPolling, isRunning, mode, onClose }) {
-  if (!result && !isPolling && !isRunning) return null
-
-  return (
-    <div className="border-t border-outline-variant bg-surface-container-low">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant">
-        <span className="text-sm font-medium text-gray-300">
-          {mode === 'run' ? 'Test Result (sample cases)' : 'Submission Result'}
-        </span>
-        <button onClick={onClose} className="text-gray-500 hover:text-on-surface text-lg leading-none">×</button>
-      </div>
-      <div className="px-4 py-4 min-h-[100px]">
-        {(isPolling || isRunning) && !result ? (
-          <div className="flex items-center gap-3 text-yellow-400">
-            <Spinner size="sm" />
-            <span className="text-sm">
-              {mode === 'run' ? 'Running against sample cases...' : 'Submitting solution...'}
-            </span>
-          </div>
-        ) : result ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-4">
-              <span className={`text-xl font-bold ${getStatusColor(result.status)}`}>
-                {result.status === 'ACCEPTED' ? '✓ Accepted' :
-                 result.status === 'WRONG_ANSWER' ? '✗ Wrong Answer' :
-                 result.status === 'COMPILATION_ERROR' ? '✗ Compilation Error' :
-                 result.status === 'TIME_LIMIT_EXCEEDED' ? '⏱ Time Limit Exceeded' :
-                 result.status === 'RUNTIME_ERROR' ? '✗ Runtime Error' :
-                 result.status}
-              </span>
-            </div>
-            <div className="flex items-center gap-6 text-sm">
-              {(() => {
-                const p = result.passed ?? result.passed_testcases
-                const t = result.total  ?? result.total_testcases
-                if (t > 0) return (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500">Tests passed</span>
-                    <span className={p === t ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium'}>
-                      {p} / {t}
-                    </span>
-                  </div>
-                )
-              })()}
-              {result.execution_time_ms > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">Runtime</span>
-                  <span className="text-on-surface font-medium">{result.execution_time_ms} ms</span>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  )
-}
 
 export default function ContestSolvePage() {
   const { id: contestId, questionId } = useParams()

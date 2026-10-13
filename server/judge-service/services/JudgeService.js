@@ -326,23 +326,21 @@ using namespace std;
 ${sourceCode}
 
 vector<int> _parseIntVec(const string& s) {
+    // Accepts both "[1,2,3]" and plain "1 2 3": commas and brackets are
+    // treated as whitespace so either input style parses.
     vector<int> v; string t = s;
-    t.erase(remove(t.begin(), t.end(), '['), t.end());
-    t.erase(remove(t.begin(), t.end(), ']'), t.end());
-    if (t.empty()) return v;
-    stringstream ss(t); string tok;
-    while (getline(ss, tok, ',')) if (!tok.empty()) v.push_back(stoi(tok));
+    for (char& c : t) if (c == '[' || c == ']' || c == ',') c = ' ';
+    stringstream ss(t); long long x;
+    while (ss >> x) v.push_back((int)x);
     return v;
 }
 
 vector<string> _parseStrVec(const string& s) {
+    // Accepts both "[\"a\",\"b\"]" and plain "a b".
     vector<string> v; string t = s;
-    t.erase(remove(t.begin(), t.end(), '['), t.end());
-    t.erase(remove(t.begin(), t.end(), ']'), t.end());
-    t.erase(remove(t.begin(), t.end(), '"'), t.end());
-    if (t.empty()) return v;
+    for (char& c : t) if (c == '[' || c == ']' || c == ',' || c == '"') c = ' ';
     stringstream ss(t); string tok;
-    while (getline(ss, tok, ',')) if (!tok.empty()) v.push_back(tok);
+    while (ss >> tok) v.push_back(tok);
     return v;
 }
 
@@ -709,6 +707,13 @@ const judgeSubmission = async ({ submissionId, userId, questionId, language, sou
 
 // ─── Synchronous run (no DB, sample test cases only) ─────────────────────────
 
+/**
+ * Runs the code against the given cases and reports each one individually.
+ *
+ * Only ever called with sample cases, whose inputs and expected outputs the
+ * solver can already see on the problem page — so returning the actual output
+ * alongside them reveals nothing new, and is what makes a failure diagnosable.
+ */
 const runCode = async (language, sourceCode, testCases) => {
     const prepared = await prepareExecutable(language, sourceCode);
 
@@ -719,13 +724,16 @@ const runCode = async (language, sourceCode, testCases) => {
             total: testCases.length,
             execution_time_ms: 0,
             detail: prepared.details || null,
+            results: [],
         };
     }
 
     let passed = 0, totalExecTime = 0, status = "ACCEPTED";
+    const results = [];
 
     try {
-        for (const tc of testCases) {
+        for (let i = 0; i < testCases.length; i++) {
+            const tc = testCases[i];
             const result = await execInDocker(
                 prepared.image,
                 prepared.execCmd,
@@ -733,27 +741,47 @@ const runCode = async (language, sourceCode, testCases) => {
                 tc.input_data || ""
             );
 
+            const expected = (tc.expected_output || "").trim().replace(/\r\n/g, "\n");
+
             if (result.error) {
                 status = result.error; // TIME_LIMIT_EXCEEDED / RUNTIME_ERROR etc.
+                results.push({
+                    index: i + 1,
+                    input: tc.input_data || "",
+                    expected,
+                    actual: null,
+                    error: result.error,
+                    detail: result.details || null,
+                    passed: false,
+                    execution_time_ms: result.executionTimeMs || 0,
+                });
                 break;
             }
 
             totalExecTime += result.executionTimeMs || 0;
 
-            const actual   = (result.stdout || "").trim().replace(/\r\n/g, "\n");
-            const expected = (tc.expected_output || "").trim().replace(/\r\n/g, "\n");
+            const actual = (result.stdout || "").trim().replace(/\r\n/g, "\n");
+            const ok = outputsMatch(actual, expected);
 
-            if (outputsMatch(actual, expected)) {
-                passed++;
-            } else {
-                status = "WRONG_ANSWER";
-            }
+            if (ok) passed++;
+            else status = "WRONG_ANSWER";
+
+            results.push({
+                index: i + 1,
+                input: tc.input_data || "",
+                expected,
+                actual,
+                error: null,
+                detail: null,
+                passed: ok,
+                execution_time_ms: result.executionTimeMs || 0,
+            });
         }
     } finally {
         await fs.rm(prepared.tmpDir, { recursive: true, force: true }).catch(() => {});
     }
 
-    return { status, passed, total: testCases.length, execution_time_ms: totalExecTime };
+    return { status, passed, total: testCases.length, execution_time_ms: totalExecTime, results };
 };
 
 module.exports = { judgeSubmission, runCode };
