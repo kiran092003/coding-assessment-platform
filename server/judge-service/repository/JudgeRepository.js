@@ -94,9 +94,33 @@ const updateSubmissionStatus = async (
 
     const verdict = { submissionId, status, passedTestcases, totalTestcases, executionTimeMs };
 
-    // Invalidate submission cache so the next REST poll returns fresh data.
-    // Keys are caller-scoped (submission:<id>:caller:<userId>), so clear the set.
+    /* Clear every cache that now holds a stale snapshot of this submission.
+       The single-submission key is not enough: the submission lists are cached
+       too, and they were populated moments earlier while the status was still
+       PENDING. Leaving them is what made a finished submission keep showing as
+       pending on the question page until the TTL lapsed, while the My
+       Submissions list — cached under a shorter TTL — already showed the
+       verdict. */
+    const [[row]] = await pool.execute(
+        `SELECT user_id, question_id, contest_id FROM submissions WHERE id = ?`,
+        [submissionId]
+    );
+
     const staleKeys = await client.keys(`submission:${submissionId}:caller:*`);
+
+    if (row) {
+        staleKeys.push(
+            `submissions:user:${row.user_id}:all`,
+            `submissions:user:${row.user_id}:question:${row.question_id}`,
+            `submissions:question:${row.question_id}`
+        );
+        if (row.contest_id) {
+            staleKeys.push(
+                `submissions:user:${row.user_id}:question:${row.question_id}:contest:${row.contest_id}`
+            );
+        }
+    }
+
     if (staleKeys.length) await client.del(staleKeys);
 
     // Push status update to submission-service via Redis Pub/Sub

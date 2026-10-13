@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createSubmission, getSubmissionById, getMySubmissions, getAllMySubmissions, runCode as runCodeApi } from '../api/submissionsApi'
 
 const TERMINAL_STATUSES = ['ACCEPTED', 'WRONG_ANSWER', 'COMPILATION_ERROR', 'TIME_LIMIT_EXCEEDED', 'MEMORY_LIMIT_EXCEEDED', 'RUNTIME_ERROR']
@@ -17,6 +17,7 @@ export const useMySubmissions = (questionId, contestId = null) => useQuery({
 })
 
 export const useSubmitCode = () => {
+  const queryClient = useQueryClient()
   const [submissionId, setSubmissionId] = useState(null)
   const [result, setResult] = useState(null)
   const [isPolling, setIsPolling] = useState(false)
@@ -32,13 +33,17 @@ export const useSubmitCode = () => {
     },
   })
 
-  // Stop polling and save result when a terminal status arrives
+  // Stop polling and save result when a terminal status arrives. The cached
+  // submission lists still hold the PENDING snapshot taken at submit time, so
+  // they are dropped here — otherwise the question's Submissions tab keeps
+  // showing "Pending" for a solution that has already been judged.
   useEffect(() => {
     if (pollingData && TERMINAL_STATUSES.includes(pollingData.status)) {
       setResult(pollingData)
       setIsPolling(false)
+      queryClient.invalidateQueries({ queryKey: ['submissions'] })
     }
-  }, [pollingData])
+  }, [pollingData, queryClient])
 
   const submit = useMutation({
     mutationFn: createSubmission,
@@ -46,6 +51,7 @@ export const useSubmitCode = () => {
       setSubmissionId(data.submissionId)
       setIsPolling(true)
       setResult(null)
+      queryClient.invalidateQueries({ queryKey: ['submissions'] })
     }
   })
 
