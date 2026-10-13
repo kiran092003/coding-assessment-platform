@@ -5,6 +5,7 @@ const os = require("os");
 const judgeRepository = require("../repository/JudgeRepository");
 const { publishScoredEvent } = require("../producer/RabbitMQProducer");
 const { createLogger } = require("../../shared/logger/logger");
+const { KIND, planParams } = require("../lib/paramPlan");
 const { increment } = require("../metrics");
 
 const logger = createLogger("judge-service");
@@ -114,11 +115,36 @@ const runProcess = (cmd, args, cwd, stdinData, timeoutMs) => {
 
 // ─── Output comparison (float-tolerant) ──────────────────────────────────────
 
+/* Two output styles exist in the question bank: sequences written the
+   competitive way ("0 1") and the LeetCode way ("[0,1]"). Normalising
+   brackets and commas to spaces lets either form satisfy either expectation,
+   while newlines stay significant so a matrix still has to have the right
+   shape. */
+const normaliseOutput = (text) =>
+    String(text)
+        .replace(/\r\n/g, "\n")
+        .replace(/[[\],"]/g, " ")
+        .split("\n")
+        .map(line => line.trim().replace(/[ \t]+/g, " "))
+        .join("\n")
+        .trim();
+
 const outputsMatch = (actual, expected) => {
     if (actual === expected) return true;
-    const a = parseFloat(actual), e = parseFloat(expected);
-    if (!isNaN(a) && !isNaN(e) && isFinite(a) && isFinite(e)) {
-        return Math.abs(a - e) < 1e-6;
+
+    const na = normaliseOutput(actual);
+    const ne = normaliseOutput(expected);
+    if (na === ne) return true;
+
+    // Single numbers compare with a tolerance taken from however many
+    // decimals the expected value carries, so a solution that prints
+    // 33.63636364 still matches an expected 33.6364.
+    const a = parseFloat(na), e = parseFloat(ne);
+    if (!isNaN(a) && !isNaN(e) && isFinite(a) && isFinite(e) &&
+        !/\s/.test(na) && !/\s/.test(ne)) {
+        const decimals = (ne.split(".")[1] || "").length;
+        const tolerance = decimals > 0 ? 0.5 * Math.pow(10, -decimals) + 1e-9 : 1e-6;
+        return Math.abs(a - e) <= tolerance;
     }
     return false;
 };
@@ -139,42 +165,100 @@ const getClassName = (src) => {
     return m ? m[1] : "Solution";
 };
 
+/* Maps a Java type onto the C++ spelling planParams understands. */
+const JAVA_TO_CPP = (type) => {
+    if (/int\s*\[\s*\]\s*\[\s*\]/.test(type)) return "vector<vector<int>>";
+    if (/int\s*\[\s*\]/.test(type))           return "vector<int>";
+    if (/String\s*\[\s*\]/.test(type))        return "vector<string>";
+    if (/\bdouble\b|\bfloat\b/.test(type))    return "double";
+    if (/\bboolean\b/.test(type))             return "bool";
+    if (/\blong\b/.test(type))                return "long long";
+    if (/\bchar\b/.test(type))                return "char";
+    if (/\bString\b/.test(type))              return "string";
+    return "int";
+};
+
 const generateJavaWrapper = (sourceCode) => {
     let src = sourceCode.replace(/\bpublic(\s+class\s+(?!Main)\w+)/g, "$1");
-    const className = getClassName(src);
     const methodMatch = src.match(/public\s+([\w\[\]<>, ]+?)\s+(\w+)\s*\(([^)]*)\)/);
     if (!methodMatch) return null;
 
     const returnType = methodMatch[1].trim();
     const methodName = methodMatch[2];
-    const params = methodMatch[3].trim() ? methodMatch[3].split(",").map(p => p.trim()) : [];
+    const rawParams  = methodMatch[3].trim() ? methodMatch[3].split(",").map(p => p.trim()) : [];
 
-    const declarations = params.map((param, i) => {
-        if (/int\[\]/.test(param))
-            return `String raw${i} = lines[${i}].trim().replaceAll("[\\\\[\\\\]\\\\s]", "");\n` +
-                   `        int[] p${i} = raw${i}.isEmpty() ? new int[0] : java.util.Arrays.stream(raw${i}.split(",")).mapToInt(x -> Integer.parseInt(x.trim())).toArray();`;
-        if (/String\[\]/.test(param)) return `String[] p${i} = lines[${i}].trim().replaceAll("[\\\\[\\\\]\\\\"]", "").split(",");`;
-        if (/double/.test(param))  return `double p${i} = Double.parseDouble(lines[${i}].trim());`;
-        if (/long/.test(param))    return `long p${i} = Long.parseLong(lines[${i}].trim());`;
-        if (/boolean/.test(param)) return `boolean p${i} = Boolean.parseBoolean(lines[${i}].trim());`;
-        if (/int/.test(param))     return `int p${i} = Integer.parseInt(lines[${i}].trim());`;
-        return `String p${i} = lines[${i}].trim();`;
+    // "int[] arr" -> "vector<int> arr"
+    const normalised = rawParams.map((prm) => {
+        const bits = prm.trim().split(/\s+/);
+        const name = bits[bits.length - 1];
+        const type = bits.slice(0, -1).join(" ");
+        return JAVA_TO_CPP(type) + " " + name;
+    });
+    const plan = planParams(normalised);
+
+    const sizeExpr = (spec, tail) => {
+        if (!spec) return "0";
+        if (spec.from !== undefined) return "(int) p" + spec.from;
+        return "(_left() - " + (tail || 0) + ")";
+    };
+
+    const declarations = plan.map((prm) => {
+        const v = "p" + prm.index;
+        switch (prm.kind) {
+            case KIND.LONG:   return "long " + v + " = Long.parseLong(_next());";
+            case KIND.DOUBLE: return "double " + v + " = Double.parseDouble(_next());";
+            case KIND.BOOL:   return "boolean " + v + " = Boolean.parseBoolean(_next());";
+            case KIND.CHAR:   return "char " + v + " = _next().charAt(0);";
+            case KIND.STRING: return "String " + v + " = _next();";
+            case KIND.VEC_INT:
+                return "int _k" + prm.index + " = " + sizeExpr(prm.size, prm.tailScalars) + ";\n        " +
+                       "int[] " + v + " = new int[_k" + prm.index + "];\n        " +
+                       "for (int _i = 0; _i < _k" + prm.index + "; _i++) " + v + "[_i] = Integer.parseInt(_next());";
+            case KIND.VEC_STR:
+                return "int _k" + prm.index + " = " + sizeExpr(prm.size, prm.tailScalars) + ";\n        " +
+                       "String[] " + v + " = new String[_k" + prm.index + "];\n        " +
+                       "for (int _i = 0; _i < _k" + prm.index + "; _i++) " + v + "[_i] = _next();";
+            case KIND.MATRIX: {
+                const rows = sizeExpr(prm.rows, prm.tailScalars);
+                const cols = prm.cols && prm.cols.from !== undefined
+                    ? "(int) p" + prm.cols.from
+                    : "(_r" + prm.index + " > 0 ? _left() / _r" + prm.index + " : 0)";
+                return "int _r" + prm.index + " = " + rows + ";\n        " +
+                       "int _c" + prm.index + " = " + cols + ";\n        " +
+                       "int[][] " + v + " = new int[_r" + prm.index + "][_c" + prm.index + "];\n        " +
+                       "for (int _i = 0; _i < _r" + prm.index + "; _i++) for (int _j = 0; _j < _c" + prm.index + "; _j++) " +
+                       v + "[_i][_j] = Integer.parseInt(_next());";
+            }
+            default: return "int " + v + " = Integer.parseInt(_next());";
+        }
     });
 
-    const callArgs = params.map((_, i) => `p${i}`).join(", ");
+    const callArgs = plan.map(prm => "p" + prm.index).join(", ");
+
     let printBlock;
-    if (/int\[\]|long\[\]/.test(returnType)) {
-        printBlock = `StringBuilder sb = new StringBuilder("[");\n` +
-                     `        for (int i = 0; i < result.length; i++) { if (i > 0) sb.append(","); sb.append(result[i]); }\n` +
-                     `        sb.append("]"); System.out.println(sb.toString());`;
-    } else if (/String\[\]/.test(returnType)) {
-        printBlock = `System.out.println(String.join(",", result));`;
-    } else if (returnType === "void") {
+    if (/int\s*\[\s*\]\s*\[\s*\]/.test(returnType)) {
+        printBlock =
+            "for (int[] _row : result) {\n" +
+            "            StringBuilder sb = new StringBuilder();\n" +
+            "            for (int _i = 0; _i < _row.length; _i++) { if (_i > 0) sb.append(' '); sb.append(_row[_i]); }\n" +
+            "            System.out.println(sb.toString());\n" +
+            "        }";
+    } else if (/int\s*\[\s*\]|long\s*\[\s*\]/.test(returnType)) {
+        printBlock =
+            "StringBuilder sb = new StringBuilder();\n" +
+            "        for (int _i = 0; _i < result.length; _i++) { if (_i > 0) sb.append(' '); sb.append(result[_i]); }\n" +
+            "        System.out.println(sb.toString());";
+    } else if (/String\s*\[\s*\]/.test(returnType)) {
+        printBlock = "System.out.println(String.join(\" \", result));";
+    } else if (/\bvoid\b/.test(returnType)) {
         printBlock = "";
     } else {
-        printBlock = `System.out.println(result);`;
+        printBlock = "System.out.println(result);";
     }
-    const callLine = returnType === "void" ? `sol.${methodName}(${callArgs});` : `${returnType} result = sol.${methodName}(${callArgs});`;
+
+    const callLine = /\bvoid\b/.test(returnType)
+        ? "new Solution()." + methodName + "(" + callArgs + ");"
+        : returnType + " result = new Solution()." + methodName + "(" + callArgs + ");";
 
     return `import java.util.*;
 import java.io.*;
@@ -182,16 +266,21 @@ import java.io.*;
 ${src}
 
 public class Main {
-    public static void main(String[] args) throws Exception {
-        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-        List<String> lineList = new ArrayList<>();
-        String line;
-        while ((line = br.readLine()) != null) {
-            if (!line.trim().isEmpty()) lineList.add(line);
-        }
-        String[] lines = lineList.toArray(new String[0]);
+    static String[] _tok;
+    static int _at = 0;
 
-        ${className} sol = new ${className}();
+    static String _next() { return _at < _tok.length ? _tok[_at++] : ""; }
+    static int _left() { return Math.max(0, _tok.length - _at); }
+
+    public static void main(String[] args) throws IOException {
+        // Whole of stdin as one token stream; brackets and commas separate.
+        ByteArrayOutputStream _buf = new ByteArrayOutputStream();
+        byte[] _chunk = new byte[8192];
+        int _n;
+        while ((_n = System.in.read(_chunk)) > 0) _buf.write(_chunk, 0, _n);
+        String _raw = _buf.toString("UTF-8").replaceAll("[\\\\[\\\\],\\"]", " ");
+        _tok = _raw.trim().isEmpty() ? new String[0] : _raw.trim().split("\\\\s+");
+
         ${declarations.join("\n        ")}
         ${callLine}
         ${printBlock}
@@ -199,7 +288,15 @@ public class Main {
 }`;
 };
 
-// ─── Python Wrapper ───────────────────────────────────────────────────────────
+const PY_TO_CPP = (ann) => {
+    if (/list\s*\[\s*list\s*\[\s*int/i.test(ann)) return "vector<vector<int>>";
+    if (/list\s*\[\s*int/i.test(ann))             return "vector<int>";
+    if (/list\s*\[\s*str/i.test(ann))             return "vector<string>";
+    if (/float/i.test(ann))                        return "double";
+    if (/bool/i.test(ann))                         return "bool";
+    if (/str/i.test(ann))                          return "string";
+    return "int";
+};
 
 const generatePythonWrapper = (sourceCode) => {
     const methodMatch = sourceCode.match(
@@ -210,60 +307,93 @@ const generatePythonWrapper = (sourceCode) => {
     const methodName = methodMatch[1];
     const paramsRaw  = (methodMatch[2] || "").trim();
     const returnType = (methodMatch[3] || "").trim();
-    const params = paramsRaw ? paramsRaw.split(",").map(p => p.trim()).filter(Boolean) : [];
+    const rawParams  = paramsRaw ? paramsRaw.split(",").map(p => p.trim()).filter(Boolean) : [];
 
-    const parsers = params.map((param, i) => {
-        const ann = param.includes(":") ? param.split(":")[1].trim() : "";
-        if (/List\[List\[int\]\]|list\[list\[int\]\]/.test(ann))
-            return `p${i} = json.loads(lines[${i}])`;
-        if (/List\[int\]|list\[int\]/.test(ann))
-            return `p${i} = [int(x) for x in lines[${i}].strip().strip('[]').split(',') if x.strip()]`;
-        if (/List\[str\]|list\[str\]/.test(ann))
-            return `p${i} = [x.strip().strip('"').strip("'") for x in lines[${i}].strip().strip('[]').split(',') if x.strip()]`;
-        if (/float/.test(ann))  return `p${i} = float(lines[${i}].strip())`;
-        if (/bool/.test(ann))   return `p${i} = lines[${i}].strip().lower() == 'true'`;
-        if (/int/.test(ann))    return `p${i} = int(lines[${i}].strip())`;
-        if (/str/.test(ann))    return `p${i} = lines[${i}].strip()`;
-        return `p${i} = _parse(lines[${i}].strip())`;
+    // "arr: list[int]" -> "vector<int> arr"
+    const normalised = rawParams.map((prm) => {
+        const parts = prm.includes(":") ? prm.split(":") : [prm, ""];
+        const name = parts[0].trim();
+        const ann  = (parts[1] || "").trim();
+        return PY_TO_CPP(ann) + " " + name;
+    });
+    const plan = planParams(normalised);
+
+    const sizeExpr = (spec, tail) => {
+        if (!spec) return "0";
+        if (spec.from !== undefined) return "p" + spec.from;
+        return "(_left() - " + (tail || 0) + ")";
+    };
+
+    const declarations = plan.map((prm) => {
+        const v = "p" + prm.index;
+        switch (prm.kind) {
+            case KIND.DOUBLE: return v + " = float(_next())";
+            case KIND.BOOL:   return v + " = _next().lower() == 'true'";
+            case KIND.STRING: return v + " = _next()";
+            case KIND.CHAR:   return v + " = _next()[:1]";
+            case KIND.VEC_INT:
+                return "_k" + prm.index + " = " + sizeExpr(prm.size, prm.tailScalars) + "\n    " +
+                       v + " = [int(_next()) for _ in range(_k" + prm.index + ")]";
+            case KIND.VEC_STR:
+                return "_k" + prm.index + " = " + sizeExpr(prm.size, prm.tailScalars) + "\n    " +
+                       v + " = [_next() for _ in range(_k" + prm.index + ")]";
+            case KIND.MATRIX: {
+                const rows = sizeExpr(prm.rows, prm.tailScalars);
+                const cols = prm.cols && prm.cols.from !== undefined
+                    ? "p" + prm.cols.from
+                    : "(_left() // _r" + prm.index + " if _r" + prm.index + " else 0)";
+                return "_r" + prm.index + " = " + rows + "\n    " +
+                       "_c" + prm.index + " = " + cols + "\n    " +
+                       v + " = [[int(_next()) for _ in range(_c" + prm.index + ")] for _ in range(_r" + prm.index + ")]";
+            }
+            default: return v + " = int(_next())";
+        }
     });
 
-    const callArgs  = params.map((_, i) => `p${i}`).join(", ");
+    const callArgs = plan.map(prm => "p" + prm.index).join(", ");
     const printResult = returnType === "None" ? "" : "_print_result(result)";
 
     return `from typing import *
-import json
 ${sourceCode}
 
 import sys as _sys
 
-def _parse(s):
-    s = s.strip()
-    if s.startswith('['):
-        inner = s.strip('[]')
-        if not inner: return []
-        try: return [int(x.strip()) for x in inner.split(',')]
-        except: return [x.strip().strip('"').strip("'") for x in inner.split(',')]
-    try: return int(s)
-    except:
-        try: return float(s)
-        except: return s
+_raw = _sys.stdin.read()
+for _ch in '[],"':
+    _raw = _raw.replace(_ch, ' ')
+_tok = _raw.split()
+_at = 0
+
+def _next():
+    global _at
+    v = _tok[_at] if _at < len(_tok) else ''
+    _at += 1
+    return v
+
+def _left():
+    return max(0, len(_tok) - _at)
 
 def _print_result(v):
-    if v is None: return
-    if isinstance(v, list): print(str(v).replace(' ', ''))
-    elif isinstance(v, bool): print(str(v).lower())
-    else: print(v)
+    if v is None:
+        return
+    if isinstance(v, bool):
+        print(str(v).lower())
+    elif isinstance(v, list):
+        if v and isinstance(v[0], list):
+            for _row in v:
+                print(' '.join(str(x) for x in _row))
+        else:
+            print(' '.join(str(x) for x in v))
+    else:
+        print(v)
 
 if __name__ == '__main__':
-    lines = [l for l in _sys.stdin.read().splitlines() if l.strip()]
     sol = Solution()
-    ${parsers.join("\n    ")}
+    ${declarations.join("\n    ")}
     result = sol.${methodName}(${callArgs})
     ${printResult}
 `;
 };
-
-// ─── C++ Wrapper ──────────────────────────────────────────────────────────────
 
 const generateCppWrapper = (sourceCode) => {
     const methodMatch = sourceCode.match(
@@ -274,42 +404,62 @@ const generateCppWrapper = (sourceCode) => {
     const returnType = methodMatch[1].trim();
     const methodName = methodMatch[2];
     const paramsRaw  = methodMatch[3].trim();
-    const params = paramsRaw ? paramsRaw.split(",").map(p => p.trim()).filter(Boolean) : [];
+    const rawParams  = paramsRaw ? paramsRaw.split(",").map(p => p.trim()).filter(Boolean) : [];
+    const plan = planParams(rawParams);
 
-    const declarations = params.map((param, i) => {
-        const clean = param.replace(/&/g, "").replace(/\bconst\b/g, "").trim();
-        const lastSpace = clean.lastIndexOf(" ");
-        const type = clean.substring(0, lastSpace).trim();
+    const sizeExpr = (spec, tailScalars) => {
+        if (!spec) return "0";
+        if (spec.from !== undefined) return `(int)p${spec.from}`;
+        return `(int)(_left() - ${tailScalars || 0})`;
+    };
 
-        if (/vector\s*<\s*vector\s*<\s*int/.test(type)) return `auto p${i} = _parseIntMatrix(lines[${i}]);`;
-        if (/vector\s*<\s*int\s*>/.test(type))          return `auto p${i} = _parseIntVec(lines[${i}]);`;
-        if (/vector\s*<\s*string\s*>/.test(type))        return `auto p${i} = _parseStrVec(lines[${i}]);`;
-        if (/long\s+long/.test(type))                    return `long long p${i} = stoll(lines[${i}]);`;
-        if (/double/.test(type))                         return `double p${i} = stod(lines[${i}]);`;
-        if (/bool/.test(type))                           return `bool p${i} = (lines[${i}] == "true");`;
-        if (/string/.test(type))                         return `string p${i} = lines[${i}];`;
-        return `int p${i} = stoi(lines[${i}]);`;
+    const declarations = plan.map((p) => {
+        const v = `p${p.index}`;
+        switch (p.kind) {
+            case KIND.LONG:   return `long long ${v} = _nextLL();`;
+            case KIND.DOUBLE: return `double ${v} = _nextD();`;
+            case KIND.BOOL:   return `bool ${v} = _nextBool();`;
+            case KIND.CHAR:   return `char ${v} = _nextTok()[0];`;
+            case KIND.STRING: return `string ${v} = _nextTok();`;
+            case KIND.VEC_INT:
+                return `int _k${p.index} = ${sizeExpr(p.size, p.tailScalars)};\n    ` +
+                       `vector<int> ${v}; for (int _i = 0; _i < _k${p.index}; _i++) ${v}.push_back((int)_nextLL());`;
+            case KIND.VEC_STR:
+                return `int _k${p.index} = ${sizeExpr(p.size, p.tailScalars)};\n    ` +
+                       `vector<string> ${v}; for (int _i = 0; _i < _k${p.index}; _i++) ${v}.push_back(_nextTok());`;
+            case KIND.MATRIX: {
+                const rows = sizeExpr(p.rows, p.tailScalars);
+                const cols = p.cols && p.cols.from !== undefined
+                    ? `(int)p${p.cols.from}`
+                    : `(_r${p.index} > 0 ? (int)(_left() / _r${p.index}) : 0)`;
+                return `int _r${p.index} = ${rows};\n    ` +
+                       `int _c${p.index} = ${cols};\n    ` +
+                       `vector<vector<int>> ${v};\n    ` +
+                       `for (int _i = 0; _i < _r${p.index}; _i++) { vector<int> _row; ` +
+                       `for (int _j = 0; _j < _c${p.index}; _j++) _row.push_back((int)_nextLL()); ${v}.push_back(_row); }`;
+            }
+            default: return `int ${v} = (int)_nextLL();`;
+        }
     });
 
-    const callArgs = params.map((_, i) => `p${i}`).join(", ");
+    const callArgs = plan.map(p => `p${p.index}`).join(", ");
 
+    /* Sequences print space-separated and matrices one row per line, matching
+       how the expected outputs are stored. The comparison also normalises
+       brackets and commas, so a "[0,1]" style answer still matches. */
     let printResult;
     if (/vector\s*<\s*vector\s*<\s*int/.test(returnType)) {
         printResult =
-            `cout << "[";\n` +
-            `    for (int i = 0; i < (int)result.size(); i++) {\n` +
-            `        if (i) cout << ",";\n` +
-            `        cout << "[";\n` +
-            `        for (int j = 0; j < (int)result[i].size(); j++) { if (j) cout << ","; cout << result[i][j]; }\n` +
-            `        cout << "]";\n` +
-            `    }\n` +
-            `    cout << "]" << endl;`;
-    } else if (/vector\s*<\s*int/.test(returnType)) {
-        printResult = `cout << "[";\n    for (int i = 0; i < (int)result.size(); i++) { if (i) cout << ","; cout << result[i]; }\n    cout << "]" << endl;`;
-    } else if (/vector\s*<\s*string/.test(returnType)) {
-        printResult = `cout << "[";\n    for (int i = 0; i < (int)result.size(); i++) { if (i) cout << ","; cout << result[i]; }\n    cout << "]" << endl;`;
+            `for (size_t i = 0; i < result.size(); i++) {\n` +
+            `        for (size_t j = 0; j < result[i].size(); j++) { if (j) cout << ' '; cout << result[i][j]; }\n` +
+            `        cout << endl;\n` +
+            `    }`;
+    } else if (/vector\s*<\s*(int|string)/.test(returnType)) {
+        printResult = `for (size_t i = 0; i < result.size(); i++) { if (i) cout << ' '; cout << result[i]; }\n    cout << endl;`;
     } else if (/bool/.test(returnType)) {
         printResult = `cout << (result ? "true" : "false") << endl;`;
+    } else if (/double|float/.test(returnType)) {
+        printResult = `cout << setprecision(10) << result << endl;`;
     } else if (/void/.test(returnType)) {
         printResult = "";
     } else {
@@ -325,43 +475,24 @@ using namespace std;
 
 ${sourceCode}
 
-vector<int> _parseIntVec(const string& s) {
-    // Accepts both "[1,2,3]" and plain "1 2 3": commas and brackets are
-    // treated as whitespace so either input style parses.
-    vector<int> v; string t = s;
-    for (char& c : t) if (c == '[' || c == ']' || c == ',') c = ' ';
-    stringstream ss(t); long long x;
-    while (ss >> x) v.push_back((int)x);
-    return v;
-}
+static vector<string> _tok;
+static size_t _at = 0;
 
-vector<string> _parseStrVec(const string& s) {
-    // Accepts both "[\"a\",\"b\"]" and plain "a b".
-    vector<string> v; string t = s;
-    for (char& c : t) if (c == '[' || c == ']' || c == ',' || c == '"') c = ' ';
-    stringstream ss(t); string tok;
-    while (ss >> tok) v.push_back(tok);
-    return v;
-}
-
-vector<vector<int>> _parseIntMatrix(const string& s) {
-    vector<vector<int>> mat;
-    vector<int> row;
-    int num = 0, sign = 1; bool inNum = false;
-    for (char c : s) {
-        if (c == '[')      { row.clear(); }
-        else if (c == ']') { if (inNum) { row.push_back(sign*num); inNum=false; num=0; sign=1; } if (!row.empty() || !mat.empty()) mat.push_back(row); }
-        else if (c == ',') { if (inNum) { row.push_back(sign*num); inNum=false; num=0; sign=1; } }
-        else if (c == '-') { sign = -1; }
-        else if (isdigit(c)) { num = num*10+(c-'0'); inNum = true; }
-    }
-    return mat;
-}
+static size_t _left() { return _tok.size() - _at; }
+static string _nextTok() { return _at < _tok.size() ? _tok[_at++] : string(); }
+static long long _nextLL() { string t = _nextTok(); return t.empty() ? 0LL : stoll(t); }
+static double _nextD() { string t = _nextTok(); return t.empty() ? 0.0 : stod(t); }
+static bool _nextBool() { string t = _nextTok(); return t == "true" || t == "1"; }
 
 int main() {
-    vector<string> lines;
-    string line;
-    while (getline(cin, line)) if (!line.empty()) lines.push_back(line);
+    // Read the whole of stdin as one token stream. Brackets, commas and quotes
+    // are separators, so "[2,7,11,15]" and "2 7 11 15" parse identically.
+    string _all((istreambuf_iterator<char>(cin)), istreambuf_iterator<char>());
+    for (char& c : _all) if (c == '[' || c == ']' || c == ',' || c == '"') c = ' ';
+    {
+        stringstream _ss(_all); string _t;
+        while (_ss >> _t) _tok.push_back(_t);
+    }
 
     Solution sol;
     ${declarations.join("\n    ")}
@@ -454,7 +585,6 @@ int main() {
 const generateJsWrapper = (sourceCode) => {
     let methodName, paramsRaw, isClass = false;
 
-    // Pattern 1: class Solution — find first non-constructor method
     const classBodyMatch = sourceCode.match(/class\s+Solution\s*\{([\s\S]*)/);
     if (classBodyMatch) {
         const body = classBodyMatch[1];
@@ -467,60 +597,124 @@ const generateJsWrapper = (sourceCode) => {
             }
         }
     }
-
-    // Pattern 2: var/let/const funcName = function(params)
     if (!methodName) {
         const m = sourceCode.match(/(?:var|let|const)\s+(\w+)\s*=\s*function\s*\(([^)]*)\)/);
         if (m) { methodName = m[1]; paramsRaw = m[2]; }
     }
-
-    // Pattern 3: function funcName(params)
     if (!methodName) {
         const m = sourceCode.match(/^function\s+(\w+)\s*\(([^)]*)\)/m);
         if (m) { methodName = m[1]; paramsRaw = m[2]; }
     }
-
-    // Pattern 4: arrow  const funcName = (params) =>
     if (!methodName) {
         const m = sourceCode.match(/(?:var|let|const)\s+(\w+)\s*=\s*\(([^)]*)\)\s*=>/);
         if (m) { methodName = m[1]; paramsRaw = m[2]; }
     }
-
     if (!methodName) return null;
 
-    const params   = (paramsRaw || "").trim() ? paramsRaw.split(",").map(p => p.trim()).filter(Boolean) : [];
-    const parsers  = params.map((_, i) => `const p${i} = _parse(lines[${i}]);`);
-    const callArgs = params.map((_, i) => `p${i}`).join(", ");
+    const names = (paramsRaw || "").trim()
+        ? paramsRaw.split(",").map(p => p.trim()).filter(Boolean)
+        : [];
+
+    /* JavaScript carries no types in the signature, so the sizes come from the
+       JSDoc the starter template provides (`@param {number[]} arr`). Without
+       it every parameter is read as a single token, which is right for the
+       scalar-only problems and the best that can be inferred otherwise. */
+    const jsdoc = new Map();
+    const docPattern = /@param\s*\{([^}]+)\}\s*(\w+)/g;
+    let d;
+    while ((d = docPattern.exec(sourceCode)) !== null) jsdoc.set(d[2], d[1]);
+
+    /* Parameter names used by the question bank for collections. JavaScript
+       signatures carry no types, so when the JSDoc has been deleted these
+       names are the only signal left that something is a sequence. */
+    const COLLECTION_NAMES = new Set([
+        "arr", "nums", "a", "b", "words", "tokens", "keys", "prices", "heights",
+        "coins", "intervals", "meetings", "edges", "queries", "grid", "matrix",
+    ]);
+    const MATRIX_NAMES = new Set(["grid", "matrix", "edges", "intervals", "meetings", "queries"]);
+
+    const JS_TO_CPP = (t, name) => {
+        if (!t) {
+            if (MATRIX_NAMES.has(name)) return "vector<vector<int>>";
+            if (COLLECTION_NAMES.has(name)) return "vector<int>";
+            return "int";
+        }
+        if (/\[\s*\]\s*\[\s*\]|number\[\]\[\]/.test(t)) return "vector<vector<int>>";
+        if (/string\s*\[\s*\]/i.test(t))                return "vector<string>";
+        if (/\[\s*\]/.test(t))                          return "vector<int>";
+        if (/boolean/i.test(t))                         return "bool";
+        if (/string/i.test(t))                          return "string";
+        return "int";
+    };
+
+    const plan = planParams(names.map(n => JS_TO_CPP(jsdoc.get(n), n) + " " + n));
+
+    const sizeExpr = (spec, tail) => {
+        if (!spec) return "0";
+        if (spec.from !== undefined) return "p" + spec.from;
+        return "(_left() - " + (tail || 0) + ")";
+    };
+
+    const declarations = plan.map((prm) => {
+        const v = "const p" + prm.index;
+        switch (prm.kind) {
+            case KIND.DOUBLE: return v + " = Number(_next());";
+            case KIND.BOOL:   return v + " = _next() === 'true';";
+            case KIND.STRING:
+            case KIND.CHAR:   return v + " = _next();";
+            case KIND.VEC_INT:
+                return "const _k" + prm.index + " = " + sizeExpr(prm.size, prm.tailScalars) + ";\n" +
+                       v + " = Array.from({ length: _k" + prm.index + " }, () => Number(_next()));";
+            case KIND.VEC_STR:
+                return "const _k" + prm.index + " = " + sizeExpr(prm.size, prm.tailScalars) + ";\n" +
+                       v + " = Array.from({ length: _k" + prm.index + " }, () => _next());";
+            case KIND.MATRIX: {
+                const rows = sizeExpr(prm.rows, prm.tailScalars);
+                const cols = prm.cols && prm.cols.from !== undefined
+                    ? "p" + prm.cols.from
+                    : "(_r" + prm.index + " > 0 ? Math.floor(_left() / _r" + prm.index + ") : 0)";
+                return "const _r" + prm.index + " = " + rows + ";\n" +
+                       "const _c" + prm.index + " = " + cols + ";\n" +
+                       v + " = Array.from({ length: _r" + prm.index + " }, () => " +
+                       "Array.from({ length: _c" + prm.index + " }, () => Number(_next())));";
+            }
+            default: return v + " = Number(_next());";
+        }
+    });
+
+    const callArgs = plan.map(prm => "p" + prm.index).join(", ");
     const callExpr = isClass
-        ? `new Solution().${methodName}(${callArgs})`
-        : `${methodName}(${callArgs})`;
+        ? "new Solution()." + methodName + "(" + callArgs + ")"
+        : methodName + "(" + callArgs + ")";
 
     return `${sourceCode}
 
-const _readline = require('readline');
-const _rl = _readline.createInterface({ input: process.stdin });
-const _lines = [];
-_rl.on('line', l => { if (l.trim()) _lines.push(l.trim()); });
-_rl.on('close', () => {
-    const lines = _lines;
-    const _parse = (s) => {
-        if (s.startsWith('[')) {
-            const inner = s.slice(1, -1);
-            if (!inner) return [];
-            const nums = inner.split(',').map(x => x.trim());
-            const asNums = nums.map(Number);
-            return asNums.every(n => !isNaN(n)) ? asNums : nums;
+const _raw = require('fs').readFileSync(0, 'utf8').replace(/[\\[\\],"]/g, ' ');
+const _tok = _raw.split(/\\s+/).filter(Boolean);
+let _at = 0;
+const _next = () => (_at < _tok.length ? _tok[_at++] : '');
+const _left = () => Math.max(0, _tok.length - _at);
+
+${declarations.join("\n")}
+
+const _result = ${callExpr};
+
+if (_result !== undefined && _result !== null) {
+    if (Array.isArray(_result)) {
+        if (_result.length && Array.isArray(_result[0])) {
+            console.log(_result.map(r => r.join(' ')).join('\\n'));
+        } else {
+            console.log(_result.join(' '));
         }
-        const n = Number(s);
-        return isNaN(n) ? s : n;
-    };
-    ${parsers.join("\n    ")}
-    const result = ${callExpr};
-    if (Array.isArray(result)) console.log('[' + result.join(',') + ']');
-    else console.log(result);
-});
+    } else if (typeof _result === 'boolean') {
+        console.log(_result ? 'true' : 'false');
+    } else {
+        console.log(_result);
+    }
+}
 `;
 };
+
 
 // ─── Compile once, return Docker image + exec command ─────────────────────────
 // Returns { tmpDir, image, execCmd } on success

@@ -123,63 +123,45 @@ const getDefaultCode = (language, title = 'solve', returnType = 'int', params = 
     return ` * @param {${toJsRt(clean.join(' '))}} ${name}`
   }).join('\n')
 
-  // Every seeded problem is stdin -> stdout and the statement spells out the
-  // exact line format, so the starter reads stdin directly. A `class Solution`
-  // skeleton cannot express a multi-line input such as a grid or an edge list.
-  // A Solution class still works for simple signatures — the judge wraps it.
+  // Function-based, like LeetCode: the solver fills in one method and the
+  // judge wraps it in a main() that reads stdin and prints the return value.
   const templates = {
     CPP:
 `#include <bits/stdc++.h>
 using namespace std;
 
-// Read the input exactly as described in the problem statement.
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
+class Solution {
+public:
+    ${returnType} ${fn}(${params}) {
 
-    // e.g.  int n; cin >> n;
-    //       vector<int> a(n); for (int& x : a) cin >> x;
-
-    return 0;
-}
+    }
+};
 `,
     JAVA:
-`import java.util.*;
-import java.io.*;
-
-// Read the input exactly as described in the problem statement.
-public class Main {
-    public static void main(String[] args) throws IOException {
-        StreamTokenizer in = new StreamTokenizer(new BufferedInputStream(System.in));
-
-        // e.g.  in.nextToken(); int n = (int) in.nval;
+`class Solution {
+    public ${javaRt} ${fn}(${javaP}) {
 
     }
 }
 `,
     PYTHON:
-`import sys
-
-# Read the input exactly as described in the problem statement.
-def main():
-    data = sys.stdin.read().split()
-    # e.g.  n = int(data[0]); a = list(map(int, data[1:1 + n]))
-
-main()
+`class Solution:
+    def ${fn}(self${pyP}) -> ${pyRt}:
+        pass
 `,
     JAVASCRIPT:
-`// Read the input exactly as described in the problem statement.
-const data = require('fs').readFileSync(0, 'utf8').split(/\s+/).filter(Boolean);
+`/**
+${jsJsdoc ? jsJsdoc + '\n' : ''} * @return {${jsRt}}
+ */
+var ${fn} = function(${jsP}) {
 
-// e.g.  const n = Number(data[0]);
-//       const a = data.slice(1, 1 + n).map(Number);
+};
 `,
     C:
 `#include <stdio.h>
 
-/* Read the input exactly as described in the problem statement. */
+// C has no classes: write a full program that reads stdin and prints stdout.
 int main(void) {
-    /* e.g.  int n; scanf("%d", &n); */
 
     return 0;
 }
