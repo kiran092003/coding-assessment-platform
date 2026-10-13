@@ -6,6 +6,11 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 const { randInt, randArray, randWord, reader, LOWER } = require('../lib/util');
+/* Constraints mirror the generator's own bounds, so they cannot drift from
+   the data that is actually produced. */
+const rangeLine = (name, lo, hi) => '- `' + lo + ' <= ' + name + ' <= ' + hi + '`';
+const sizeLine  = (name, maxN, minN) => rangeLine(name, minN === undefined ? 1 : minN, maxN);
+
 
 /* ── Family: single integer array ───────────────────────────────────────── */
 
@@ -137,6 +142,7 @@ const arrayFamily = arrayVariants.map((v) => ({
     returnType: 'int',
     params: 'int n, vector<int> arr',
     description: v.task + '\n\n' + ARRAY_IO,
+    constraints: [sizeLine('n', 40), rangeLine('arr[i]', -50, 100)],
     genInput: (rng, caseIdx) => {
         // Early cases stay small so the samples read clearly; later ones grow.
         const n = caseIdx < 3 ? randInt(rng, 1, 5) : randInt(rng, 5, 40);
@@ -344,6 +350,7 @@ const intFamily = intVariants.map((v) => ({
     returnType: BIG_INT_SLUGS.has(v.slug) ? 'long long' : 'int',
     params: 'int n',
     description: v.task + '\n\n' + INT_IO,
+    constraints: [rangeLine('n', v.range[0], v.range[1])],
     genInput: (rng, caseIdx) => {
         const lo = v.range[0];
         const hi = v.range[1];
@@ -494,6 +501,7 @@ const strFamily = strVariants.map((v) => ({
     returnType: v.ret,
     params: 'string s',
     description: v.task + '\n\n' + STR_IO,
+    constraints: [sizeLine('s.length', 40), '- `s` consists of lowercase English letters only'],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 1, 6) : randInt(rng, 6, 40);
         // A narrow alphabet makes repeats — and so runs — likely.
@@ -595,6 +603,7 @@ const pairFamily = pairVariants.map((v) => ({
     returnType: PAIR_BIG_SLUGS.has(v.slug) ? 'long long' : 'int',
     params: 'int a, int b',
     description: v.task + '\n\n' + PAIR_IO,
+    constraints: [rangeLine('a, b', 1, 1000)],
     genInput: (rng, caseIdx) => {
         const hi = caseIdx < 3 ? 20 : 1000;
         let a = randInt(rng, 1, hi);

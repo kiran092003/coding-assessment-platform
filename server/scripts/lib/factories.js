@@ -9,6 +9,11 @@ const { randInt, randArray, randWord, reader, LOWER } = require('./util');
 
 const OUT_ONE = '\n\n**Output**\nPrint the answer on one line.';
 
+/* Constraints are derived from the same opts the generator uses, so the stated
+   bounds cannot drift away from the data that actually gets produced. */
+const rangeLine = (name, lo, hi) => '- `' + lo + ' <= ' + name + ' <= ' + hi + '`';
+const sizeLine  = (name, maxN, minN) => rangeLine(name, minN === undefined ? 1 : minN, maxN);
+
 const IO = {
     nArray: [
         '**Input**',
@@ -47,6 +52,10 @@ const arrayProblem = (difficulty) => (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'int n, vector<int> arr',
     description: task + '\n\n' + IO.nArray + OUT_ONE,
+    constraints: [
+        sizeLine('n', opts.maxN || 40, opts.minN || 1),
+        rangeLine('arr[i]', opts.lo === undefined ? -40 : opts.lo, opts.hi === undefined ? 80 : opts.hi),
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3
             ? randInt(rng, opts.minN || 1, 5)
@@ -72,6 +81,10 @@ const arrayKProblem = (difficulty) => (slug, title, task, solve, opts = {}) => (
     returnType: opts.returnType || 'int',
     params: 'int n, int k, vector<int> arr',
     description: task + '\n\n' + IO.nkArray + OUT_ONE,
+    constraints: [
+        sizeLine('n', opts.maxN || 40, 2),
+        rangeLine('arr[i]', opts.lo === undefined ? 1 : opts.lo, opts.hi === undefined ? 50 : opts.hi),
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 2, 6) : randInt(rng, 6, opts.maxN || 40);
         const lo = opts.lo === undefined ? 1 : opts.lo;
@@ -97,6 +110,10 @@ const twoArrayProblem = (difficulty) => (slug, title, task, solve, opts = {}) =>
     returnType: opts.returnType || 'int',
     params: 'int n, vector<int> a, vector<int> b',
     description: task + '\n\n' + IO.twoArrays + OUT_ONE,
+    constraints: [
+        sizeLine('n', opts.maxN || 30),
+        rangeLine('a[i], b[i]', opts.lo === undefined ? 1 : opts.lo, opts.hi === undefined ? 40 : opts.hi),
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 1, 5) : randInt(rng, 5, opts.maxN || 30);
         const lo = opts.lo === undefined ? 1 : opts.lo;
@@ -131,6 +148,7 @@ const intProblem = (difficulty) => (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'int n',
     description: task + '\n\n' + IO.oneInt + OUT_ONE,
+    constraints: [rangeLine('n', opts.range ? opts.range[0] : 1, opts.range ? opts.range[1] : 1000)],
     genInput: (rng, caseIdx) => {
         const lo = opts.range ? opts.range[0] : 1;
         const hi = opts.range ? opts.range[1] : 1000;
@@ -148,6 +166,7 @@ const pairProblem = (difficulty) => (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'int a, int b',
     description: task + '\n\n' + IO.twoInts + OUT_ONE,
+    constraints: [rangeLine('a, b', opts.lo === undefined ? 1 : opts.lo, opts.hi || 100)],
     genInput: (rng, caseIdx) => {
         const lo = opts.lo === undefined ? 1 : opts.lo;
         const hi = caseIdx < 3 ? Math.min(opts.hi || 100, 20) : (opts.hi || 100);
@@ -170,6 +189,7 @@ const tripleProblem = (difficulty) => (slug, title, task, solve, opts = {}) => (
     returnType: opts.returnType || 'int',
     params: 'int a, int b, int c',
     description: task + '\n\n' + IO.threeInts + OUT_ONE,
+    constraints: [rangeLine('a, b, c', opts.lo === undefined ? 1 : opts.lo, opts.hi || 100)],
     genInput: (rng, caseIdx) => {
         const lo = opts.lo === undefined ? 1 : opts.lo;
         const hi = caseIdx < 3 ? Math.min(opts.hi || 100, 20) : (opts.hi || 100);
@@ -189,6 +209,10 @@ const strProblem = (difficulty) => (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'string s',
     description: task + '\n\n' + IO.oneStr + OUT_ONE,
+    constraints: [
+        sizeLine('s.length', opts.maxN || 40),
+        '- `s` consists of lowercase English letters only',
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 1, 6) : randInt(rng, 6, opts.maxN || 40);
         const alpha = opts.alphabet || (caseIdx % 3 === 0 ? 'ab' : caseIdx % 3 === 1 ? 'abcde' : LOWER);
@@ -205,6 +229,11 @@ const twoStrProblem = (difficulty) => (slug, title, task, solve, opts = {}) => (
     returnType: opts.returnType || 'int',
     params: 'string s, string t',
     description: task + '\n\n' + IO.twoStrs + OUT_ONE,
+    constraints: [
+        sizeLine('s.length', opts.maxN || 25),
+        sizeLine('t.length', opts.maxM || opts.maxN || 25),
+        '- `s` and `t` consist of lowercase English letters only',
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 1, 6) : randInt(rng, 5, opts.maxN || 25);
         const m = caseIdx < 3 ? randInt(rng, 1, 6) : randInt(rng, 5, opts.maxM || opts.maxN || 25);
@@ -225,6 +254,10 @@ const gridProblem = (difficulty) => (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'int n, int m, vector<vector<int>> grid',
     description: task + '\n\n' + IO.grid + OUT_ONE,
+    constraints: [
+        sizeLine('n, m', opts.maxDim || 8),
+        rangeLine('grid[i][j]', opts.lo === undefined ? 1 : opts.lo, opts.hi === undefined ? 40 : opts.hi),
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 1, 3) : randInt(rng, 3, opts.maxDim || 8);
         const m = opts.square ? n : (caseIdx < 3 ? randInt(rng, 1, 3) : randInt(rng, 3, opts.maxDim || 8));

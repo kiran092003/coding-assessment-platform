@@ -7,6 +7,11 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 const { randInt, randArray, randWord, reader, LOWER } = require('../lib/util');
+/* Constraints mirror the generator's own bounds, so they cannot drift from
+   the data that is actually produced. */
+const rangeLine = (name, lo, hi) => '- `' + lo + ' <= ' + name + ' <= ' + hi + '`';
+const sizeLine  = (name, maxN, minN) => rangeLine(name, minN === undefined ? 1 : minN, maxN);
+
 
 const IO_N_ARRAY = [
     '**Input**',
@@ -30,6 +35,10 @@ const arrayProblem = (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'int n, vector<int> arr',
     description: task + '\n\n' + IO_N_ARRAY + ONE_LINE,
+    constraints: [
+        sizeLine('n', opts.maxN || 60),
+        rangeLine('arr[i]', opts.lo === undefined ? -40 : opts.lo, opts.hi === undefined ? 80 : opts.hi),
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 1, 6) : randInt(rng, 8, opts.maxN || 60);
         const lo = opts.lo === undefined ? (caseIdx % 3 === 0 ? -40 : 1) : opts.lo;
@@ -53,6 +62,10 @@ const arrayKProblem = (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'int n, int k, vector<int> arr',
     description: task + '\n\n' + IO_N_K_ARRAY + ONE_LINE,
+    constraints: [
+        sizeLine('n', opts.maxN || 50, 2),
+        rangeLine('arr[i]', opts.lo === undefined ? 1 : opts.lo, opts.hi === undefined ? 50 : opts.hi),
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 2, 6) : randInt(rng, 8, opts.maxN || 50);
         const lo = opts.lo === undefined ? 1 : opts.lo;
@@ -342,6 +355,7 @@ const strProblem = (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'string s',
     description: task + '\n\n' + STR_ONE + ONE_LINE,
+    constraints: [sizeLine('s.length', opts.maxN || 40), '- `s` consists of lowercase English letters only'],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 2, 7) : randInt(rng, 8, opts.maxN || 40);
         const alpha = opts.alphabet || (caseIdx % 2 === 0 ? 'abc' : LOWER);
@@ -357,6 +371,11 @@ const twoStrProblem = (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'string s, string t',
     description: task + '\n\n' + STR_TWO + ONE_LINE,
+    constraints: [
+        sizeLine('s.length', opts.maxN || 25),
+        sizeLine('t.length', opts.maxN || 25),
+        '- `s` and `t` consist of lowercase English letters only',
+    ],
     genInput: (rng, caseIdx) => {
         const n = caseIdx < 3 ? randInt(rng, 2, 6) : randInt(rng, 5, opts.maxN || 25);
         const m = caseIdx < 3 ? randInt(rng, 2, 6) : randInt(rng, 5, opts.maxN || 25);
@@ -552,6 +571,7 @@ const intProblem = (slug, title, task, solve, range, returnType = 'int') => ({
     returnType,
     params: 'int n',
     description: task + '\n\n' + IO_ONE_INT + ONE_LINE,
+    constraints: [rangeLine('n', range[0], range[1])],
     genInput: (rng, caseIdx) => {
         const cap = caseIdx < 3 ? Math.min(range[1], range[0] + 30) : range[1];
         return randInt(rng, range[0], cap) + '\n';
@@ -710,6 +730,10 @@ const matrixProblem = (slug, title, task, solve, opts = {}) => ({
     returnType: opts.returnType || 'int',
     params: 'int n, int m, vector<vector<int>> grid',
     description: task + '\n\n**Input**\nThe first line contains two integers `n` and `m` — the number of rows and columns.\nThe next `n` lines each contain `m` space-separated integers.' + ONE_LINE,
+    constraints: [
+        sizeLine('n, m', 8),
+        rangeLine('grid[i][j]', opts.lo === undefined ? 1 : opts.lo, opts.hi || 50),
+    ],
     genInput: (rng, caseIdx) => {
         const square = opts.square;
         const n = caseIdx < 3 ? randInt(rng, 1, 3) : randInt(rng, 3, 8);

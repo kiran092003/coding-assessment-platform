@@ -7,6 +7,7 @@ import { useQuestion } from '@/features/questions/hooks/useQuestions'
 import { useTestCases } from '@/features/testcases/hooks/useTestCases'
 import { useSubmitCode, useRunCode, useMySubmissions } from '@/features/submissions/hooks/useSubmissions'
 import Badge from '@/components/ui/Badge'
+import Markdown from '@/components/ui/Markdown'
 import Spinner from '@/components/ui/Spinner'
 
 const LANGUAGES = ['CPP', 'JAVA', 'PYTHON', 'JAVASCRIPT', 'C']
@@ -381,9 +382,7 @@ export default function QuestionSolvePage() {
                 </div>
 
                 {/* Description */}
-                <div className="text-gray-300 text-sm leading-7 whitespace-pre-wrap">
-                  {question.description}
-                </div>
+                <Markdown>{question.description}</Markdown>
 
                 {/* Examples */}
                 {sampleCases.length > 0 && (
@@ -391,14 +390,15 @@ export default function QuestionSolvePage() {
                     {sampleCases.map((tc, idx) => (
                       <div key={tc.id}>
                         <p className="text-on-surface font-semibold text-sm mb-2">Example {idx + 1}:</p>
-                        <div className="bg-surface rounded-lg p-4 space-y-2 border border-outline-variant">
-                          <div className="font-mono text-sm">
-                            <span className="text-gray-400 font-sans font-medium">Input: </span>
-                            <span className="text-gray-100">{tc.input_data}</span>
+                        <div className="space-y-3 rounded-lg border p-4"
+                             style={{ background: 'var(--surface-lowest)', borderColor: 'var(--outline-variant)' }}>
+                          <div>
+                            <p className="label mb-1">Input</p>
+                            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[13px] leading-6 text-on-surface">{tc.input_data}</pre>
                           </div>
-                          <div className="font-mono text-sm">
-                            <span className="text-gray-400 font-sans font-medium">Output: </span>
-                            <span className="text-gray-100">{tc.expected_output}</span>
+                          <div>
+                            <p className="label mb-1">Output</p>
+                            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[13px] leading-6 text-primary">{tc.expected_output}</pre>
                           </div>
                         </div>
                       </div>
