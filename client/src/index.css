@@ -282,6 +282,69 @@
   textarea.input-field { height: auto; padding: 10px 16px; }
   select.input-field { cursor: pointer; }
 
+  /* ─── Native form controls ───────────────────────────────────
+     A <select>'s arrow and an <input type="date">'s calendar button are drawn
+     by the browser and ignore our palette. The arrow is replaced outright;
+     the date field relies on `color-scheme: dark` (set on :root) to render
+     its popup and icon dark, with the parts we can reach styled explicitly.
+     ──────────────────────────────────────────────────────────── */
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c2c6d6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.45rem center;
+    background-size: 0.85rem;
+  }
+  select:hover {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23adc6ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  }
+  /* The popup list itself is OS-drawn; these are the only properties that
+     reliably carry through. */
+  select option {
+    background-color: #272a31;
+    color: #e1e2eb;
+  }
+  select option:checked {
+    background-color: #32353c;
+    color: #adc6ff;
+  }
+
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"] {
+    color-scheme: dark;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.15s ease;
+  }
+  input[type="date"]:hover::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
+  input[type="time"]:hover::-webkit-calendar-picker-indicator {
+    opacity: 1;
+  }
+  /* An unfilled date reads as a placeholder rather than as real content. */
+  input[type="date"]:not(:focus):in-range::-webkit-datetime-edit-year-field,
+  input[type="date"]:not(:focus):in-range::-webkit-datetime-edit-month-field,
+  input[type="date"]:not(:focus):in-range::-webkit-datetime-edit-day-field,
+  input[type="date"]:not(:focus):in-range::-webkit-datetime-edit-text {
+    color: var(--on-surface);
+  }
+  input[type="date"]:invalid::-webkit-datetime-edit {
+    color: var(--outline-variant);
+  }
+
+  /* Checkboxes and radios pick up the primary accent instead of the OS blue. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--primary);
+  }
+
   /* ─── Tables: high-density, hairline rows ─────────────────── */
   .tbl-wrap {
     background: var(--surface-low);

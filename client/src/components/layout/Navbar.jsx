@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import SearchBox from './SearchBox'
 import { useLogout } from '@/features/auth/hooks/useAuth'
 
 const Icon = ({ name, className = '', size = 20 }) => (
@@ -89,14 +90,6 @@ export default function Navbar({ onMenuClick, collapsed = false, onToggleCollaps
   const { mutate: logout } = useLogout()
   const [confirmLogout, setConfirmLogout] = useState(false)
   const isAdmin = user?.role === 'ADMIN'
-  const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-
-  const submitSearch = (e) => {
-    e.preventDefault()
-    navigate(search.trim() ? `/questions?q=${encodeURIComponent(search.trim())}` : '/questions')
-  }
-
   return (
     <>
       <header
@@ -120,21 +113,7 @@ export default function Navbar({ onMenuClick, collapsed = false, onToggleCollaps
         </div>
 
         <div className="flex items-center gap-4">
-          <form onSubmit={submitSearch} className="relative hidden sm:block">
-            <span
-              className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2"
-              style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}
-            >
-              search
-            </span>
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search problems..."
-              className="input-field h-9 w-64 rounded-full pl-10 pr-4"
-            />
-          </form>
+          <SearchBox />
 
           <Link to="/submissions" className="btn-ghost" aria-label="Recent submissions">
             <Icon name="notifications" />
