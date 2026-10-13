@@ -4,15 +4,13 @@ import { useAllQuestions } from '@/features/questions/hooks/useQuestions'
 import Spinner from '@/components/ui/Spinner'
 import Badge from '@/components/ui/Badge'
 import Pagination from '@/components/ui/Pagination'
+import { TextFilter, SelectFilter, ClearFilters } from '@/components/ui/ColumnFilter'
 import usePagination from '@/hooks/usePagination'
 
-const Icon = ({ name, size = 20, className = '', filled = false }) => (
-  <span
-    className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}
-    style={{ fontSize: size }}
-  >
-    {name}
-  </span>
+const COLS = 'grid grid-cols-[70px_1fr_140px_130px]'
+
+const Icon = ({ name, size = 20, className = '', style }) => (
+  <span className={`material-symbols-outlined ${className}`} style={{ fontSize: size, ...style }}>{name}</span>
 )
 
 function diffVariant(d) {
@@ -29,22 +27,51 @@ function diffLabel(d) {
   return d || 'N/A'
 }
 
-const DIFFS = ['All', 'Low', 'Medium', 'High']
-const DIFF_LABELS = { All: 'All', Low: 'Easy', Medium: 'Medium', High: 'Hard' }
+const EMPTY = { id: '', title: '', difficulty: 'All' }
+
+function SortHeader({ label, field, sort, onSort }) {
+  const active = sort.field === field
+  return (
+    <button
+      onClick={() => onSort(field)}
+      className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wider transition-colors hover:text-primary"
+      style={{ color: active ? 'var(--primary)' : 'var(--on-surface-variant)' }}
+    >
+      {label}
+      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+        {active ? (sort.dir === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+      </span>
+    </button>
+  )
+}
 
 export default function QuestionsPage() {
   const { data: questions, isLoading, error } = useAllQuestions()
   const [params, setParams] = useSearchParams()
-  const [search, setSearch] = useState(params.get('q') || '')
-  const [difficulty, setDifficulty] = useState('All')
+  // The top-bar search routes here as ?q=, so it seeds the Title filter.
+  const [filters, setFilters] = useState({ ...EMPTY, title: params.get('q') || '' })
+  const [sort, setSort] = useState({ field: 'id', dir: 'asc' })
 
-  const filtered = useMemo(() => (questions || []).filter(q => {
-    const matchSearch = (q.title || '').toLowerCase().includes(search.toLowerCase())
-    const matchDiff   = difficulty === 'All' || q.difficluty === difficulty
-    return matchSearch && matchDiff
-  }), [questions, search, difficulty])
+  const filtersActive = Object.keys(EMPTY).some(k => filters[k] !== EMPTY[k])
 
-  const pager = usePagination(filtered, 15)
+  const set = (key, value) => {
+    setFilters(f => ({ ...f, [key]: value }))
+    if (key === 'title') {
+      const next = new URLSearchParams(params)
+      value ? next.set('q', value) : next.delete('q')
+      setParams(next, { replace: true })
+    }
+  }
+
+  const clearFilters = () => {
+    setFilters(EMPTY)
+    const next = new URLSearchParams(params)
+    next.delete('q')
+    setParams(next, { replace: true })
+  }
+
+  const toggleSort = (field) =>
+    setSort(s => (s.field === field ? { field, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { field, dir: 'asc' }))
 
   const counts = useMemo(() => {
     const all = questions || []
@@ -56,15 +83,27 @@ export default function QuestionsPage() {
     }
   }, [questions])
 
-  const onSearch = (value) => {
-    setSearch(value)
-    pager.setPage(1)
-    const next = new URLSearchParams(params)
-    value ? next.set('q', value) : next.delete('q')
-    setParams(next, { replace: true })
-  }
+  const rows = useMemo(() => {
+    const out = (questions || []).filter(q => {
+      if (filters.id && !String(q.id).includes(filters.id.trim())) return false
+      if (filters.title && !(q.title || '').toLowerCase().includes(filters.title.trim().toLowerCase())) return false
+      if (filters.difficulty !== 'All' && q.difficluty !== filters.difficulty) return false
+      return true
+    })
 
-  const clearFilters = () => { onSearch(''); setDifficulty('All'); pager.setPage(1) }
+    const dir = sort.dir === 'asc' ? 1 : -1
+    const DIFF_ORDER = { Low: 0, Medium: 1, High: 2 }
+
+    return out.sort((a, b) => {
+      switch (sort.field) {
+        case 'title':      return dir * String(a.title || '').localeCompare(String(b.title || ''))
+        case 'difficulty': return dir * ((DIFF_ORDER[a.difficluty] ?? 9) - (DIFF_ORDER[b.difficluty] ?? 9))
+        default:           return dir * (a.id - b.id)
+      }
+    })
+  }, [questions, filters, sort])
+
+  const pager = usePagination(rows, 15)
 
   return (
     <div className="animate-fade-in space-y-gutter">
@@ -78,71 +117,29 @@ export default function QuestionsPage() {
           </p>
         </div>
 
-        {/* Counters */}
         <div
           className="flex items-center gap-4 rounded-xl border px-4 py-2"
           style={{ background: 'var(--surface-cont)', borderColor: 'var(--outline-variant)' }}
         >
           <div className="text-center">
             <span className="label block text-[10px]">Total</span>
-            <span className="text-headline-sm text-primary tabular-nums">{counts.total}</span>
+            <span className="text-headline-sm tabular-nums text-primary">{counts.total}</span>
           </div>
           <div className="h-8 w-px" style={{ background: 'var(--outline-variant)' }} />
           <div className="text-center">
             <span className="label block text-[10px]">Easy</span>
-            <span className="text-headline-sm text-primary tabular-nums">{counts.easy}</span>
+            <span className="text-headline-sm tabular-nums text-primary">{counts.easy}</span>
           </div>
           <div className="h-8 w-px" style={{ background: 'var(--outline-variant)' }} />
           <div className="text-center">
             <span className="label block text-[10px]">Medium</span>
-            <span className="text-headline-sm text-tertiary tabular-nums">{counts.med}</span>
+            <span className="text-headline-sm tabular-nums text-tertiary">{counts.med}</span>
           </div>
           <div className="h-8 w-px" style={{ background: 'var(--outline-variant)' }} />
           <div className="text-center">
             <span className="label block text-[10px]">Hard</span>
-            <span className="text-headline-sm text-error tabular-nums">{counts.hard}</span>
+            <span className="text-headline-sm tabular-nums text-error">{counts.hard}</span>
           </div>
-        </div>
-      </div>
-
-      {/* ── Filter bar ── */}
-      <div className="glass-panel flex flex-wrap items-center gap-gutter rounded-xl p-stack-md">
-        <div className="min-w-[240px] flex-1">
-          <div className="relative">
-            <span
-              className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2"
-              style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}
-            >
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Search by title..."
-              value={search}
-              onChange={e => onSearch(e.target.value)}
-              className="input-field pl-10"
-            />
-          </div>
-        </div>
-
-        {/* Segmented difficulty control */}
-        <div
-          className="flex items-center gap-1 rounded p-0.5"
-          style={{ background: 'var(--surface-high)' }}
-        >
-          {DIFFS.map(d => (
-            <button
-              key={d}
-              onClick={() => { setDifficulty(d); pager.setPage(1) }}
-              className={`rounded px-3.5 py-1.5 text-label-md transition-colors ${
-                difficulty === d
-                  ? 'bg-primary text-on-primary'
-                  : 'text-on-surface-variant hover:text-primary'
-              }`}
-            >
-              {DIFF_LABELS[d]}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -156,58 +153,66 @@ export default function QuestionsPage() {
         </div>
       ) : (
         <div className="tbl-wrap">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead className="tbl-head">
-                <tr>
-                  <th className="w-16 px-4 py-3 text-center">#</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="w-32 px-4 py-3">Difficulty</th>
-                  <th className="w-28 px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pager.pageItems.map((q, idx) => {
-                  const rank = (pager.page - 1) * pager.pageSize + idx + 1
-                  return (
-                    <tr key={q.id} className="tbl-row group">
-                      <td className="px-4 py-4 text-center font-mono-code" style={{ color: 'var(--on-surface-variant)' }}>
-                        {String(rank).padStart(2, '0')}
-                      </td>
-                      <td className="px-4 py-4">
-                        <Link
-                          to={`/questions/${q.id}`}
-                          className="text-body-lg text-on-surface transition-colors group-hover:text-primary"
-                        >
-                          {q.title}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge variant={diffVariant(q.difficluty)}>{diffLabel(q.difficluty)}</Badge>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex justify-end">
-                          <Link
-                            to={`/questions/${q.id}`}
-                            className="inline-flex h-8 items-center gap-1.5 rounded border border-primary/30 bg-primary/10 px-3 text-label-md text-primary transition-colors hover:bg-primary/20 hover:border-primary"
-                          >
-                            Solve
-                            <Icon name="play_arrow" size={16} />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          {/* Header */}
+          <div className={`tbl-head ${COLS} items-center gap-3 px-5 py-3`}>
+            <SortHeader label="#"          field="id"         sort={sort} onSort={toggleSort} />
+            <SortHeader label="Title"      field="title"      sort={sort} onSort={toggleSort} />
+            <SortHeader label="Difficulty" field="difficulty" sort={sort} onSort={toggleSort} />
+            <span className="text-right">Action</span>
           </div>
 
-          {filtered.length === 0 && (
+          {/* Filter row */}
+          <div
+            className={`${COLS} items-center gap-3 border-b px-5 py-2`}
+            style={{ background: 'var(--surface-container)', borderColor: 'var(--outline-variant)' }}
+          >
+            <TextFilter value={filters.id} onChange={v => set('id', v)} placeholder="#" aria-label="Filter by ID" />
+            <TextFilter value={filters.title} onChange={v => set('title', v)} placeholder="Search title…" aria-label="Filter by title" />
+            <SelectFilter
+              value={filters.difficulty}
+              onChange={v => set('difficulty', v)}
+              aria-label="Filter by difficulty"
+              options={[
+                { value: 'All', label: 'All' },
+                { value: 'Low', label: 'Easy' },
+                { value: 'Medium', label: 'Medium' },
+                { value: 'High', label: 'Hard' },
+              ]}
+            />
+            <div className="flex justify-end">
+              <ClearFilters active={filtersActive} onClear={clearFilters} />
+            </div>
+          </div>
+
+          {/* Rows */}
+          {pager.pageItems.map(q => (
+            <div key={q.id} className={`tbl-row ${COLS} group items-center gap-3 px-5 py-3.5`}>
+              <span className="font-mono-code" style={{ color: 'var(--on-surface-variant)' }}>{q.id}</span>
+              <Link
+                to={`/questions/${q.id}`}
+                className="truncate pr-4 text-body-lg text-on-surface transition-colors group-hover:text-primary"
+                title={q.title}
+              >
+                {q.title}
+              </Link>
+              <div><Badge variant={diffVariant(q.difficluty)}>{diffLabel(q.difficluty)}</Badge></div>
+              <div className="flex justify-end">
+                <Link
+                  to={`/questions/${q.id}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded border border-primary/30 bg-primary/10 px-3 text-label-md text-primary transition-colors hover:border-primary hover:bg-primary/20"
+                >
+                  Solve
+                  <Icon name="play_arrow" size={16} />
+                </Link>
+              </div>
+            </div>
+          ))}
+
+          {rows.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
               <Icon name="search_off" size={32} style={{ color: 'var(--outline)' }} />
               <p className="text-body-md" style={{ color: 'var(--on-surface-variant)' }}>
-                No problems match your search.
+                No problems match these filters.
               </p>
               <button onClick={clearFilters} className="btn-ghost text-primary">Clear filters</button>
             </div>

@@ -37,7 +37,9 @@ function NavItem({ to, icon, label, exact, collapsed, onNavigate }) {
   )
 }
 
-export default function Sidebar({ open = false, collapsed = false, onClose, onToggleCollapse }) {
+/* Collapsing is driven from the top bar's toggle; the sidebar deliberately
+   has no second control for it. */
+export default function Sidebar({ open = false, collapsed = false, onClose }) {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'ADMIN'
 
@@ -99,17 +101,6 @@ export default function Sidebar({ open = false, collapsed = false, onClose, onTo
             </div>
           )}
         </nav>
-
-        {/* Collapse toggle — desktop only */}
-        <button
-          onClick={onToggleCollapse}
-          className={`nav-item mt-stack-md hidden lg:flex ${rail ? 'justify-center px-0' : ''}`}
-          title={rail ? 'Expand navigation' : 'Collapse navigation'}
-          aria-label={rail ? 'Expand navigation' : 'Collapse navigation'}
-        >
-          <Icon name={rail ? 'chevron_right' : 'chevron_left'} />
-          {!rail && <span>Collapse</span>}
-        </button>
 
         {/* Judge status panel — hidden in the rail, there's no room for it */}
         {!(rail && !open) && (

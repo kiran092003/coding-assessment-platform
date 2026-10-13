@@ -33,7 +33,6 @@ export default function AppLayout() {
         open={navOpen}
         collapsed={collapsed}
         onClose={() => setNavOpen(false)}
-        onToggleCollapse={() => setCollapsed(v => !v)}
       />
 
       <div
