@@ -8,6 +8,8 @@ import {
   useUpdateContestQuestionPoints,
 } from '@/features/contests/hooks/useContests'
 import { useAllQuestions } from '@/features/questions/hooks/useQuestions'
+import { useToast, apiErrorMessage } from '@/components/ui/Toast'
+import { MAX_QUESTIONS_PER_CONTEST } from '@/lib/constants'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
@@ -39,13 +41,15 @@ function diffLabel(d) {
 
 // ── Inline points editor ──────────────────────────────────────────────────
 function PointsCell({ contestId, questionId, initialPoints }) {
+  const toast = useToast()
   const [editing, setEditing] = useState(false)
   const [pts, setPts]         = useState(initialPoints)
   const { mutate, isPending } = useUpdateContestQuestionPoints()
 
   const save = () =>
     mutate({ contestId, questionId, data: { points: Number(pts) } }, {
-      onSuccess: () => setEditing(false),
+      onSuccess: () => { setEditing(false); toast.success('Points updated.') },
+      onError: (err) => toast.error(apiErrorMessage(err), { title: 'Could not update points' }),
     })
 
   if (!editing) return (
@@ -83,6 +87,7 @@ function PointsCell({ contestId, questionId, initialPoints }) {
 
 // ── Right panel — question mapping for a selected contest ─────────────────
 function QuestionPanel({ contestId }) {
+  const toast = useToast()
   const { data: contestQuestions, isLoading } = useContestQuestions(contestId)
   const { data: allQuestions }                = useAllQuestions()
   const { mutate: addQuestion,    isPending: isAdding }   = useAddContestQuestion()
@@ -105,13 +110,34 @@ function QuestionPanel({ contestId }) {
   const getPoints = (id) => pointsMap[id] ?? 100
   const setPoints = (id, v) => setPointsMap(p => ({ ...p, [id]: v }))
 
-  const handleAdd = (qId) =>
+  const addedCount = (contestQuestions || []).length
+  const isFull = addedCount >= MAX_QUESTIONS_PER_CONTEST
+
+  /* The server enforces the cap; saying so up front means the button explains
+     itself rather than failing silently when it is pressed. */
+  const handleAdd = (qId, title) => {
+    if (isFull) {
+      toast.warning(
+        `This contest already has the maximum of ${MAX_QUESTIONS_PER_CONTEST} questions. Remove one before adding another.`,
+        { title: 'Contest is full' },
+      )
+      return
+    }
     addQuestion({ contestId, questionId: qId, points: Number(getPoints(qId)) }, {
-      onSuccess: () => setPointsMap(p => { const n = { ...p }; delete n[qId]; return n }),
+      onSuccess: () => {
+        setPointsMap(p => { const n = { ...p }; delete n[qId]; return n })
+        toast.success(`"${title}" added to the contest.`)
+      },
+      onError: (err) => toast.error(apiErrorMessage(err), { title: 'Could not add question' }),
     })
+  }
 
   const confirmRemove = () => {
-    removeQuestion({ contestId, questionId: pending.id })
+    const title = pending.title
+    removeQuestion({ contestId, questionId: pending.id }, {
+      onSuccess: () => toast.success(`"${title}" removed from the contest.`),
+      onError: (err) => toast.error(apiErrorMessage(err), { title: 'Could not remove question' }),
+    })
     setPending(null)
   }
 
@@ -126,7 +152,9 @@ function QuestionPanel({ contestId }) {
           <span className="text-on-surface text-xs font-semibold uppercase tracking-wider">
             Added Questions
           </span>
-          <span className="text-xs text-outline">{(contestQuestions || []).length} total</span>
+          <span className={`text-xs ${isFull ? 'text-tertiary' : 'text-outline'}`}>
+            {addedCount} / {MAX_QUESTIONS_PER_CONTEST}{isFull ? ' — full' : ''}
+          </span>
         </div>
 
         {(contestQuestions || []).length === 0 ? (
@@ -199,9 +227,12 @@ function QuestionPanel({ contestId }) {
                   />
                   <div className="flex justify-end">
                     <button
-                      onClick={() => handleAdd(q.id)}
-                      disabled={isAdding}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 hover:bg-emerald-400/20 disabled:opacity-50 transition-all"
+                      onClick={() => handleAdd(q.id, q.title)}
+                      disabled={isAdding || isFull}
+                      title={isFull
+                        ? `A contest can hold at most ${MAX_QUESTIONS_PER_CONTEST} questions`
+                        : 'Add this question to the contest'}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
                     >
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

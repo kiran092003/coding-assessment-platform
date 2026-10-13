@@ -8,6 +8,8 @@ import {
   useUpdateContestQuestionPoints,
 } from '@/features/contests/hooks/useContests'
 import { useAllQuestions } from '@/features/questions/hooks/useQuestions'
+import { useToast, apiErrorMessage } from '@/components/ui/Toast'
+import { MAX_QUESTIONS_PER_CONTEST } from '@/lib/constants'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
@@ -27,6 +29,7 @@ function diffLabel(d) {
 
 // ── Inline points editor on existing questions ────────────────────────────
 function PointsCell({ contestId, questionId, initialPoints }) {
+  const toast = useToast()
   const [editing, setEditing]   = useState(false)
   const [pts, setPts]           = useState(initialPoints)
   const { mutate, isPending }   = useUpdateContestQuestionPoints()
@@ -34,7 +37,10 @@ function PointsCell({ contestId, questionId, initialPoints }) {
   const save = () => {
     mutate(
       { contestId, questionId, data: { points: Number(pts) } },
-      { onSuccess: () => setEditing(false) }
+      {
+        onSuccess: () => { setEditing(false); toast.success('Points updated.') },
+        onError: (err) => toast.error(apiErrorMessage(err), { title: 'Could not update points' }),
+      }
     )
   }
 
@@ -77,6 +83,7 @@ export default function ContestQuestionsPage() {
   const { data: contest }                               = useContest(id)
   const { data: contestQuestions, isLoading: cqLoading } = useContestQuestions(id)
   const { data: allQuestions }                          = useAllQuestions()
+  const toast = useToast()
   const { mutate: addQuestion,    isPending: isAdding } = useAddContestQuestion()
   const { mutate: removeQuestion, isPending: isRemoving } = useRemoveContestQuestion()
 
@@ -97,15 +104,38 @@ export default function ContestQuestionsPage() {
   const getPoints = (qId) => pointsMap[qId] ?? 100
   const setPoints = (qId, val) => setPointsMap(p => ({ ...p, [qId]: val }))
 
-  const handleAdd = (questionId) => {
+  const addedCount = (contestQuestions || []).length
+  const isFull = addedCount >= MAX_QUESTIONS_PER_CONTEST
+
+  const handleAdd = (questionId, title) => {
+    if (isFull) {
+      toast.warning(
+        `This contest already has the maximum of ${MAX_QUESTIONS_PER_CONTEST} questions. Remove one before adding another.`,
+        { title: 'Contest is full' },
+      )
+      return
+    }
     addQuestion(
       { contestId: id, questionId, points: Number(getPoints(questionId)) },
-      { onSuccess: () => setPointsMap(p => { const n = { ...p }; delete n[questionId]; return n }) }
+      {
+        onSuccess: () => {
+          setPointsMap(p => { const n = { ...p }; delete n[questionId]; return n })
+          toast.success(`"${title}" added to the contest.`)
+        },
+        onError: (err) => toast.error(apiErrorMessage(err), { title: 'Could not add question' }),
+      }
     )
   }
 
   const handleRemove = (q) => setPending({ id: q.id, title: q.title })
-  const confirmRemove = () => { removeQuestion({ contestId: id, questionId: pending.id }); setPending(null) }
+  const confirmRemove = () => {
+    const title = pending.title
+    removeQuestion({ contestId: id, questionId: pending.id }, {
+      onSuccess: () => toast.success(`"${title}" removed from the contest.`),
+      onError: (err) => toast.error(apiErrorMessage(err), { title: 'Could not remove question' }),
+    })
+    setPending(null)
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
@@ -184,6 +214,10 @@ export default function ContestQuestionsPage() {
             <h2 className="text-on-surface font-semibold text-sm">Add Questions</h2>
             <p className="text-outline text-xs mt-0.5">
               {availableQuestions.length} available from the contest-only pool
+              {' · '}
+              <span className={isFull ? 'text-tertiary' : ''}>
+                {addedCount}/{MAX_QUESTIONS_PER_CONTEST} added{isFull ? ' — full' : ''}
+              </span>
             </p>
           </div>
 
@@ -232,8 +266,11 @@ export default function ContestQuestionsPage() {
 
                 <div className="flex justify-end">
                   <button
-                    onClick={() => handleAdd(q.id)}
-                    disabled={isAdding}
+                    onClick={() => handleAdd(q.id, q.title)}
+                    title={isFull
+                      ? `A contest can hold at most ${MAX_QUESTIONS_PER_CONTEST} questions`
+                      : 'Add this question to the contest'}
+                    disabled={isAdding || isFull}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 hover:bg-emerald-400/20 hover:border-emerald-400/40 disabled:opacity-50 transition-all"
                   >
                     {isAdding ? (
